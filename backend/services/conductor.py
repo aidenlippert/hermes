@@ -100,48 +100,50 @@ class ConductorService:
             for msg in conversation_history[-5:]:  # Last 5 messages
                 conversation_context += f"{msg['role']}: {msg['content']}\n"
 
-        prompt = f"""You are analyzing a user's request to determine if you have enough information to proceed with agent execution.
-
-IMPORTANT: Look at BOTH the current request AND the conversation history to extract ALL provided information.
+        prompt = f"""You are analyzing if we have enough information to book a trip.
 
 Current Request: "{user_query}"
-
-Available Agents and Their Capabilities:
-{agent_requirements_text}
 {conversation_context}
 
-Analyze the request and conversation history thoroughly:
+EXTRACTION RULES:
+1. Look in BOTH current request AND conversation history
+2. "just me" = 1 traveler, "solo" = 1 traveler
+3. "sfo" = San Francisco, "lax" = Los Angeles
+4. "25th to 31st" = valid dates
+5. "$1000" or "1000 dollars" = valid budget
 
-1. For TRAVEL requests, extract these details from ANYWHERE in the conversation:
-   - Destination: Look for city/country names mentioned
-   - Departure location: "from [city]", "departing from [city]", "[city] airport"
-   - Travel dates: Any dates mentioned (Oct 28th, October 28-31, next week, etc.)
-   - Number of travelers: "3 people", "me and my family", "solo trip", etc.
-   - Budget: "$2000", "under 2000 usd", "budget friendly", etc.
-   - Special requirements: dietary restrictions, accessibility, preferences
+EXAMPLES:
+❌ WRONG: User said "departing from sfo" → you say "missing departure_location"
+✅ RIGHT: User said "departing from sfo" → "departure_location": "San Francisco"
 
-2. CAREFULLY check the conversation history - users often provide ALL information in their second message after being asked!
+❌ WRONG: User said "just me" → you say "missing num_travelers"
+✅ RIGHT: User said "just me" → "num_travelers": 1
 
-3. Only mark information as "missing" if it's TRULY not provided anywhere in the conversation.
+❌ WRONG: User said "1000 dollars usd" → you say "missing budget"
+✅ RIGHT: User said "1000 dollars usd" → "budget": "1000 USD"
 
-4. If you have ALL required information, set "has_sufficient_info": true
+Now extract from the conversation:
+- destination: city/country name from current request or history
+- departure_location: where user is flying FROM ("from X", "departing from X", "X airport")
+- travel_dates: any dates mentioned
+- num_travelers: number of people ("just me"=1, "3 people"=3, "solo"=1)
+- budget: dollar amount mentioned
 
-Respond in JSON format:
+Return JSON:
 {{
-    "has_sufficient_info": true or false,
-    "missing_info": ["only list truly missing items"],
-    "follow_up_questions": ["only ask for missing items"],
+    "has_sufficient_info": true/false,
+    "missing_info": ["only if TRULY missing"],
+    "follow_up_questions": ["only for missing"],
     "extracted_info": {{
-        "destination": "Cancun",
-        "departure_location": "San Diego",
-        "travel_dates": "October 28th to October 31st",
-        "num_travelers": 3,
-        "budget": "under 2000 USD",
-        "special_requirements": "none mentioned"
+        "destination": "extracted city",
+        "departure_location": "extracted city",
+        "travel_dates": "extracted dates",
+        "num_travelers": number,
+        "budget": "extracted budget"
     }}
 }}
 
-CRITICAL: If the user just provided information in response to your questions, set has_sufficient_info to TRUE and extract all the info!"""
+If user provided ALL 5 items → set "has_sufficient_info": true"""
 
         try:
             response = await llm.chat_completion([
