@@ -45,7 +45,20 @@ export default function ChatPage() {
       // Send chat request
       const response = await api.chat.send({ query: input }, token);
 
-      // Connect to WebSocket for live updates
+      // If we got a result immediately (direct LLM), show it now
+      if (response.result) {
+        addMessage({
+          id: Date.now().toString(),
+          role: "assistant",
+          content: response.result,
+          timestamp: new Date(),
+          taskId: response.task_id,
+        });
+        setStreaming(false);
+        return;
+      }
+
+      // Connect to WebSocket for live updates (multi-agent orchestration)
       const websocket = createWebSocket(response.task_id, token);
 
       websocket.onopen = () => {
@@ -57,14 +70,17 @@ export default function ChatPage() {
         addEvent(data);
 
         // Add final result as assistant message
-        if (data.type === "task_completed" && response.result) {
-          addMessage({
-            id: Date.now().toString(),
-            role: "assistant",
-            content: response.result,
-            timestamp: new Date(),
-            taskId: response.task_id,
-          });
+        if (data.type === "task_completed") {
+          const result = data.final_output || response.result;
+          if (result) {
+            addMessage({
+              id: Date.now().toString(),
+              role: "assistant",
+              content: result,
+              timestamp: new Date(),
+              taskId: response.task_id,
+            });
+          }
           setStreaming(false);
           websocket.close();
         } else if (data.type === "task_failed") {
