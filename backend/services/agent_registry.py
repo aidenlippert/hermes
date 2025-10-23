@@ -6,7 +6,7 @@ Handles agent discovery, registration, and semantic search using pgvector.
 
 import logging
 from typing import List, Optional, Dict, Any
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, String
 from sqlalchemy.ext.asyncio import AsyncSession
 import google.generativeai as genai
 import os
@@ -217,11 +217,9 @@ class AgentRegistry:
         # PostgreSQL JSON array containment
         capability_filters = []
         for cap in capabilities:
+            # Use ILIKE with CAST for JSON compatibility
             capability_filters.append(
-                func.jsonb_path_exists(
-                    Agent.capabilities,
-                    f'$[*] ? (@ like_regex "{cap}" flag "i")'
-                )
+                func.cast(Agent.capabilities, String).ilike(f'%{cap}%')
             )
 
         if capability_filters:
