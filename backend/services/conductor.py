@@ -171,22 +171,37 @@ CRITICAL: If the user just provided information in response to your questions, s
     async def discover_agents(
         db: AsyncSession,
         user_query: str,
-        parsed_intent: Dict[str, Any]
+        parsed_intent: Dict[str, Any],
+        conversation_history: List[Dict[str, str]] = None
     ) -> List[Agent]:
         """
         Discover relevant agents for the user's request.
 
         Uses capability matching and semantic search to find agents.
+        Checks conversation history to maintain context.
 
         Args:
             db: Database session
             user_query: Original user request
             parsed_intent: Parsed intent from IntentParser
+            conversation_history: Previous conversation messages
 
         Returns:
             List of relevant Agent objects
         """
         logger.info("🔍 Discovering agents...")
+
+        # Check if this is a continuation of a previous travel request
+        is_travel_continuation = False
+        if conversation_history:
+            # Look at recent messages to see if we're in a travel conversation
+            recent_messages = conversation_history[-5:]
+            for msg in recent_messages:
+                content_lower = msg.get("content", "").lower()
+                if any(keyword in content_lower for keyword in ["trip", "travel", "flight", "hotel", "book", "cancun", "vacation"]):
+                    is_travel_continuation = True
+                    logger.info("   📍 Detected travel conversation continuation")
+                    break
 
         # First try capability-based search
         required_capabilities = parsed_intent.get("required_capabilities", [])
@@ -203,8 +218,8 @@ CRITICAL: If the user just provided information in response to your questions, s
             logger.info(f"   Trying semantic search for: '{user_query}'")
             agents = await AgentRegistry.semantic_search(db, user_query, limit=10)
 
-        # If still no agents for travel queries, search explicitly
-        if not agents and parsed_intent.get("category") == "travel":
+        # If still no agents and this is a travel conversation, search for travel agents
+        if not agents and (parsed_intent.get("category") == "travel" or is_travel_continuation):
             logger.info("   Trying explicit travel agent search...")
             agents = await AgentRegistry.semantic_search(db, "travel flight hotel restaurant", limit=10)
 
@@ -307,7 +322,7 @@ Now generate your response:"""
             If execution_plan is provided, we can proceed with execution
         """
         # Step 1: Discover relevant agents
-        agents = await ConductorService.discover_agents(db, user_query, parsed_intent)
+        agents = await ConductorService.discover_agents(db, user_query, parsed_intent, conversation_history)
 
         if not agents:
             return (
