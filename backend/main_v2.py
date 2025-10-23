@@ -46,6 +46,10 @@ from backend.api import v1_websocket
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Startup state
+startup_complete = False
+startup_error = None
+
 # Initialize FastAPI
 app = FastAPI(
     title="Hermes AI Platform",
@@ -864,10 +868,21 @@ async def root():
 @app.get("/health")
 @app.get("/api/v1/health")
 async def health():
-    """Health check - simple version for Railway"""
+    """Health check - returns OK even during startup"""
+    global startup_complete, startup_error
+
+    if startup_error:
+        return {
+            "status": "degraded",
+            "version": "2.0.0",
+            "startup_complete": startup_complete,
+            "error": str(startup_error)
+        }
+
     return {
-        "status": "healthy",
-        "version": "2.0.0"
+        "status": "healthy" if startup_complete else "starting",
+        "version": "2.0.0",
+        "startup_complete": startup_complete
     }
 
 
@@ -878,31 +893,44 @@ async def health():
 @app.on_event("startup")
 async def startup():
     """Initialize everything on startup"""
+    global startup_complete, startup_error
+
     logger.info("🚀 Hermes Platform Starting...")
 
-    # Initialize database
     try:
-        await init_db()
-        logger.info("✅ PostgreSQL initialized")
-    except Exception as e:
-        logger.error(f"❌ PostgreSQL init failed: {e}")
+        # Initialize database
+        try:
+            await init_db()
+            logger.info("✅ PostgreSQL initialized")
+        except Exception as e:
+            logger.error(f"❌ PostgreSQL init failed: {e}")
+            raise
 
-    # Initialize Redis
-    try:
-        await init_redis()
-        logger.info("✅ Redis initialized")
-    except Exception as e:
-        logger.error(f"❌ Redis init failed: {e}")
+        # Initialize Redis
+        try:
+            await init_redis()
+            logger.info("✅ Redis initialized")
+        except Exception as e:
+            logger.error(f"❌ Redis init failed: {e}")
+            raise
 
-    # Seed travel agents
-    try:
-        from backend.database.connection import AsyncSessionLocal
-        async with AsyncSessionLocal() as db:
-            await seed_travel_agents(db)
-    except Exception as e:
-        logger.error(f"❌ Agent seeding failed: {e}")
+        # Seed travel agents
+        try:
+            from backend.database.connection import AsyncSessionLocal
+            async with AsyncSessionLocal() as db:
+                await seed_travel_agents(db)
+        except Exception as e:
+            logger.error(f"❌ Agent seeding failed: {e}")
+            # Don't fail startup for seeding issues
+            pass
 
-    logger.info("✅ Hermes Platform Ready!")
+        startup_complete = True
+        logger.info("✅ Hermes Platform Ready!")
+
+    except Exception as e:
+        startup_error = e
+        logger.error(f"❌ Startup failed: {e}")
+        # Don't raise - let the app start in degraded mode
 
 
 @app.on_event("shutdown")
