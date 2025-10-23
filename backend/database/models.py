@@ -17,12 +17,19 @@ Tables:
 from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, Text, ForeignKey, JSON, Enum as SQLEnum
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from pgvector.sqlalchemy import Vector
 from datetime import datetime
 from enum import Enum
 import uuid
 
 from .connection import Base
+
+# Try to import pgvector, fallback to JSON if not available
+try:
+    from pgvector.sqlalchemy import Vector
+    HAS_PGVECTOR = True
+except ImportError:
+    HAS_PGVECTOR = False
+    Vector = None
 
 
 # Enums
@@ -136,7 +143,8 @@ class Agent(Base):
     tags = Column(JSON, default=list)  # Searchable tags
 
     # Embeddings for semantic search (1536 dimensions for OpenAI/Gemini)
-    description_embedding = Column(Vector(1536), nullable=True)
+    # Falls back to JSON array if pgvector not available
+    description_embedding = Column(Vector(1536) if HAS_PGVECTOR and Vector else JSON, nullable=True)
 
     # Performance metrics
     total_calls = Column(Integer, default=0)
