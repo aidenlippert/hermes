@@ -74,15 +74,18 @@ async def init_db():
     """
     Initialize database:
     1. Create all tables
-    2. Install pgvector extension
+    2. Install pgvector extension (optional)
     """
     logger.info("🔧 Initializing database...")
 
     async with engine.begin() as conn:
-        # Install pgvector extension
-        from sqlalchemy import text
-        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-        logger.info("✅ pgvector extension installed")
+        # Try to install pgvector extension (optional, for semantic search)
+        try:
+            from sqlalchemy import text
+            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+            logger.info("✅ pgvector extension installed")
+        except Exception as e:
+            logger.warning(f"⚠️ pgvector not available (semantic search disabled): {e}")
 
         # Create all tables
         await conn.run_sync(Base.metadata.create_all)
