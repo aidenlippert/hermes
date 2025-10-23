@@ -122,7 +122,7 @@ class AgentRegistry:
         status: AgentStatus = AgentStatus.ACTIVE
     ) -> List[Agent]:
         """
-        Search for agents using semantic similarity.
+        Search for agents using semantic similarity or text search.
 
         Args:
             db: Database session
@@ -134,18 +134,10 @@ class AgentRegistry:
         Returns:
             List of agents ranked by relevance
         """
-        logger.info(f"🔍 Semantic search: '{query}'")
+        logger.info(f"🔍 Agent search: '{query}'")
 
-        # Check cache first
-        cache_key = f"agent_search:{query}:{category}:{limit}"
-        cached = await Cache.get(cache_key)
-        if cached:
-            logger.info("   ✅ Returning cached results")
-            # TODO: Deserialize from cache
-            pass
-
-        # Create query embedding
-        query_embedding = await AgentRegistry.create_embedding(query)
+        # Check if pgvector is available
+        USE_PGVECTOR = os.getenv("USE_PGVECTOR", "false").lower() == "true"
 
         # Build SQL query
         stmt = select(Agent)
@@ -157,11 +149,31 @@ class AgentRegistry:
         if category:
             stmt = stmt.where(Agent.category == category)
 
-        # Order by cosine similarity (pgvector)
-        # Note: Using L2 distance as proxy (smaller = more similar)
-        stmt = stmt.order_by(
-            Agent.description_embedding.l2_distance(query_embedding)
-        )
+        if USE_PGVECTOR:
+            try:
+                # Create query embedding for vector search
+                query_embedding = await AgentRegistry.create_embedding(query)
+
+                # Order by cosine similarity (pgvector)
+                stmt = stmt.order_by(
+                    Agent.description_embedding.l2_distance(query_embedding)
+                )
+            except Exception as e:
+                logger.warning(f"⚠️ Vector search failed, using text search: {e}")
+                USE_PGVECTOR = False
+
+        if not USE_PGVECTOR:
+            # Fallback to text search
+            logger.info("   Using text-based search (pgvector disabled)")
+            search_pattern = f"%{query}%"
+            stmt = stmt.where(
+                or_(
+                    Agent.name.ilike(search_pattern),
+                    Agent.description.ilike(search_pattern),
+                    Agent.category.ilike(search_pattern)
+                )
+            )
+            stmt = stmt.order_by(Agent.average_rating.desc())
 
         # Limit results
         stmt = stmt.limit(limit)
