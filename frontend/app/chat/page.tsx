@@ -18,6 +18,7 @@ export default function ChatPage() {
   const [executionSteps, setExecutionSteps] = useState<any[]>([]);
   const [awaitingApproval, setAwaitingApproval] = useState(false);
   const [approvalData, setApprovalData] = useState<any>(null);
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -103,7 +104,15 @@ export default function ChatPage() {
     setApprovalData(null);
 
     try {
-      const response = await api.chat.send({ query: input }, token);
+      const response = await api.chat.send({
+        query: input,
+        conversation_id: conversationId || undefined
+      }, token);
+
+      // Save conversation ID for next message
+      if (response.conversation_id) {
+        setConversationId(response.conversation_id);
+      }
 
       if (response.result) {
         simulateTokenStreaming(response.result);
@@ -225,7 +234,13 @@ export default function ChatPage() {
         </div>
 
         <div className="flex-1 p-4">
-          <button className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium">
+          <button
+            onClick={() => {
+              setConversationId(null);
+              useChatStore.setState({ messages: [] });
+            }}
+            className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
+          >
             New Chat
           </button>
         </div>
