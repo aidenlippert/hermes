@@ -412,7 +412,38 @@ async def chat(
                 steps=[]
             )
 
-        # STEP 4: We have execution plan - create workflow plan
+        # STEP 4: Check if plan requires user approval
+        if execution_plan.get("requires_approval", False):
+            # Show agents and wait for user approval
+            logger.info("👀 Awaiting user approval for agents...")
+
+            # Update task as waiting for approval
+            await TaskService.complete_task(db, task.id, final_output=response_message)
+
+            # Add assistant message
+            await ConversationService.add_message(
+                db, conversation_id, "assistant", response_message, task.id
+            )
+
+            # Send awaiting approval event
+            await manager.send_to_task(task.id, {
+                "type": "awaiting_approval",
+                "task_id": task.id,
+                "message": response_message,
+                "agents": execution_plan["agents"],
+                "extracted_info": execution_plan.get("extracted_info", {})
+            })
+
+            return ChatResponse(
+                task_id=task.id,
+                conversation_id=conversation_id,
+                status="awaiting_approval",
+                message="Agents discovered, awaiting approval",
+                result=response_message,
+                steps=[]
+            )
+
+        # STEP 5: User approved - create workflow plan
         logger.info("📋 Creating execution plan...")
 
         available_agents = execution_plan["agents"]
@@ -433,7 +464,7 @@ async def chat(
             "total_steps": len(plan.steps)
         })
 
-        # STEP 5: Execute Plan (with real-time WebSocket streaming!)
+        # STEP 6: Execute Plan (with real-time WebSocket streaming!)
         logger.info("⚡ Executing plan...")
         result = await executor.execute(plan, task.id)
 

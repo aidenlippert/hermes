@@ -95,44 +95,46 @@ class ConductorService:
 
         prompt = f"""You are analyzing a user's request to determine if you have enough information to proceed with agent execution.
 
-User Request: "{user_query}"
+IMPORTANT: Look at BOTH the current request AND the conversation history to extract ALL provided information.
+
+Current Request: "{user_query}"
 
 Available Agents and Their Capabilities:
 {agent_requirements_text}
 {conversation_context}
 
-Analyze the request and determine:
+Analyze the request and conversation history thoroughly:
 
-1. For TRAVEL requests specifically, check if you have:
-   - Destination (where are they going?)
-   - Departure location (where are they leaving from?)
-   - Travel dates (when are they going and returning?)
-   - Number of travelers (how many people?)
-   - Budget/price range (what's their budget?)
-   - Special requirements (dietary restrictions, accessibility needs, activity preferences, etc.)
+1. For TRAVEL requests, extract these details from ANYWHERE in the conversation:
+   - Destination: Look for city/country names mentioned
+   - Departure location: "from [city]", "departing from [city]", "[city] airport"
+   - Travel dates: Any dates mentioned (Oct 28th, October 28-31, next week, etc.)
+   - Number of travelers: "3 people", "me and my family", "solo trip", etc.
+   - Budget: "$2000", "under 2000 usd", "budget friendly", etc.
+   - Special requirements: dietary restrictions, accessibility, preferences
 
-2. What information is EXPLICITLY provided in the user's request or conversation history?
+2. CAREFULLY check the conversation history - users often provide ALL information in their second message after being asked!
 
-3. What CRITICAL information is missing that prevents agent execution?
+3. Only mark information as "missing" if it's TRULY not provided anywhere in the conversation.
 
-4. What follow-up questions should we ask to gather missing information?
+4. If you have ALL required information, set "has_sufficient_info": true
 
 Respond in JSON format:
 {{
-    "has_sufficient_info": false,
-    "missing_info": ["departure_location", "travel_dates", "number_of_travelers", "budget"],
-    "follow_up_questions": [
-        "Where will you be departing from?",
-        "What are your travel dates?",
-        "How many people will be traveling?",
-        "What's your budget for this trip?"
-    ],
+    "has_sufficient_info": true or false,
+    "missing_info": ["only list truly missing items"],
+    "follow_up_questions": ["only ask for missing items"],
     "extracted_info": {{
-        "destination": "extracted value or null"
+        "destination": "Cancun",
+        "departure_location": "San Diego",
+        "travel_dates": "October 28th to October 31st",
+        "num_travelers": 3,
+        "budget": "under 2000 USD",
+        "special_requirements": "none mentioned"
     }}
 }}
 
-Be conversational and friendly in your follow-up questions. Keep them concise and grouped logically."""
+CRITICAL: If the user just provided information in response to your questions, set has_sufficient_info to TRUE and extract all the info!"""
 
         try:
             response = await llm.chat_completion([
@@ -357,16 +359,35 @@ Now generate your response:"""
                     "id": agent.id,
                     "name": agent.name,
                     "endpoint": agent.endpoint,
-                    "capabilities": agent.capabilities
+                    "capabilities": agent.capabilities,
+                    "description": agent.description
                 }
                 for agent in agents
             ],
             "extracted_info": analysis.get("extracted_info", {}),
-            "ready_for_execution": True
+            "ready_for_execution": True,
+            "requires_approval": True  # User must approve agents before execution
         }
 
+        extracted = analysis.get("extracted_info", {})
+        info_summary = []
+        if extracted.get("destination"):
+            info_summary.append(f"📍 Destination: {extracted['destination']}")
+        if extracted.get("departure_location"):
+            info_summary.append(f"🛫 Departing from: {extracted['departure_location']}")
+        if extracted.get("travel_dates"):
+            info_summary.append(f"📅 Dates: {extracted['travel_dates']}")
+        if extracted.get("num_travelers"):
+            info_summary.append(f"👥 Travelers: {extracted['num_travelers']}")
+        if extracted.get("budget"):
+            info_summary.append(f"💰 Budget: {extracted['budget']}")
+
+        summary_text = "\n".join(info_summary) if info_summary else "Planning your trip"
+
         return (
-            f"Perfect! I have all the information I need. Let me coordinate with "
-            f"{', '.join([a.name for a in agents])} to help you.",
+            f"Perfect! I found {len(agents)} specialized agents to help plan your trip:\n\n"
+            f"{summary_text}\n\n"
+            f"I'll use {', '.join([a.name for a in agents])} to find the best options. "
+            f"Review the agents below and let me know if you'd like to proceed!",
             execution_plan
         )

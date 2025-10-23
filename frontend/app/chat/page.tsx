@@ -16,6 +16,8 @@ export default function ChatPage() {
   const [currentAgents, setCurrentAgents] = useState<any[]>([]);
   const [discoveryPhase, setDiscoveryPhase] = useState<string | null>(null);
   const [executionSteps, setExecutionSteps] = useState<any[]>([]);
+  const [awaitingApproval, setAwaitingApproval] = useState(false);
+  const [approvalData, setApprovalData] = useState<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -59,6 +61,28 @@ export default function ChatPage() {
     }, 50);
   };
 
+  const handleApprove = async () => {
+    if (!token || !approvalData) return;
+
+    setAwaitingApproval(false);
+    setStreaming(true);
+    setDiscoveryPhase("Creating execution plan...");
+
+    // Send approval message
+    const approvalMessage = {
+      id: Date.now().toString(),
+      role: "user" as const,
+      content: "Yes, proceed with these agents",
+      timestamp: new Date(),
+    };
+
+    addMessage(approvalMessage);
+
+    // This will trigger execution with approved agents
+    // For now we just continue - the backend will need an approval endpoint
+    // TODO: Create /api/v1/approve/{task_id} endpoint
+  };
+
   const handleSend = async () => {
     if (!input.trim() || !token || isStreaming) return;
 
@@ -75,6 +99,8 @@ export default function ChatPage() {
     setCurrentAgents([]);
     setDiscoveryPhase(null);
     setExecutionSteps([]);
+    setAwaitingApproval(false);
+    setApprovalData(null);
 
     try {
       const response = await api.chat.send({ query: input }, token);
@@ -105,6 +131,21 @@ export default function ChatPage() {
         if (data.type === "follow_up_required") {
           setDiscoveryPhase(null);
           setCurrentAgents([]);
+          setAwaitingApproval(false);
+          simulateTokenStreaming(data.message);
+          websocket.close();
+          return;
+        }
+
+        // Awaiting approval
+        if (data.type === "awaiting_approval") {
+          setDiscoveryPhase(null);
+          setAwaitingApproval(true);
+          setApprovalData({
+            agents: data.agents,
+            extracted_info: data.extracted_info
+          });
+          setCurrentAgents(data.agents || []);
           simulateTokenStreaming(data.message);
           websocket.close();
           return;
@@ -310,7 +351,7 @@ export default function ChatPage() {
                   <p className="text-sm font-medium text-muted-foreground mb-3">
                     🔍 Found {currentAgents.length} specialized agents:
                   </p>
-                  <div className="grid grid-cols-1 gap-3">
+                  <div className="grid grid-cols-1 gap-3 mb-4">
                     {currentAgents.map((agent, i) => (
                       <div
                         key={i}
@@ -323,7 +364,7 @@ export default function ChatPage() {
                               <h4 className="font-semibold text-sm">{agent.name}</h4>
                             </div>
                             <p className="text-xs text-muted-foreground mb-2">
-                              {agent.capabilities?.join(", ") || "No capabilities listed"}
+                              {agent.description || agent.capabilities?.join(", ") || "No capabilities listed"}
                             </p>
                             {/* Coming soon - price and rating */}
                             <div className="flex items-center gap-3 text-xs text-muted-foreground">
@@ -344,6 +385,17 @@ export default function ChatPage() {
                       </div>
                     ))}
                   </div>
+
+                  {/* Approval Button */}
+                  {awaitingApproval && (
+                    <button
+                      onClick={handleApprove}
+                      className="w-full px-6 py-3 bg-primary text-primary-foreground rounded-xl font-medium hover:bg-primary/90 transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-2"
+                    >
+                      <Sparkles className="w-5 h-5" />
+                      Approve & Execute
+                    </button>
+                  )}
                 </div>
               </div>
             )}
