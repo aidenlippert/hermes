@@ -22,6 +22,7 @@ DESTINATION_COORDS = {
     "new york": {"lat": 40.7128, "lon": -74.0060, "airport": "JFK"},
     "los angeles": {"lat": 34.0522, "lon": -118.2437, "airport": "LAX"},
     "san diego": {"lat": 32.7157, "lon": -117.1611, "airport": "SAN"},
+    "seattle": {"lat": 47.6062, "lon": -122.3321, "airport": "SEA"},
 }
 
 AIRPORT_CODES = {
@@ -32,6 +33,7 @@ AIRPORT_CODES = {
     "chicago": "ORD",
     "boston": "BOS",
     "san francisco": "SFO",
+    "seattle": "SEA",
 }
 
 
