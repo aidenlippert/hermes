@@ -27,7 +27,7 @@ class LLMProvider:
         self.providers = []
 
         # Priority 1: AI/ML API (best free tier, 200+ models)
-        aimlapi_key = os.getenv("AIMLAPI_KEY")
+        aimlapi_key = os.getenv("AIMLAPI_KEY") or os.getenv("AIML_API_KEY")
         if aimlapi_key:
             try:
                 self.aimlapi_client = OpenAI(
