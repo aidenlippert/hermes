@@ -2,6 +2,8 @@
 
 Multi-agent travel planning demonstration showcasing agent discovery, orchestration, and human-in-the-loop collaboration.
 
+**✅ Fully A2A Protocol v0.3.0 Compliant** - All agents implement Google's Agent-to-Agent protocol with JSON-RPC 2.0, SSE streaming, and proper task lifecycle management.
+
 ## Quick Start
 
 ### 1. Start the Agents
@@ -71,27 +73,32 @@ Conductor orchestrates:
 Result: Complete travel itinerary with all bookings
 ```
 
-## Agent Capabilities
+## Agent Capabilities (A2A Skills)
 
 ### FlightBooker
-- `flight_search`: Find available flights
-- `flight_booking`: Book selected flights
-- `price_comparison`: Compare prices across airlines
+**A2A Endpoint**: `http://localhost:10010`
+**Agent Card**: `http://localhost:10010/.well-known/agent-card.json`
+- `search_flights`: Find available flights based on origin, destination, dates, and preferences
+- `book_flight`: Book a specific flight for a passenger
+- `price_comparison`: Compare prices across airlines and dates
 
 ### HotelBooker
-- `hotel_search`: Search accommodations
-- `hotel_booking`: Reserve rooms
-- Filter by: price, amenities, rating, location
+**A2A Endpoint**: `http://localhost:10011`
+**Agent Card**: `http://localhost:10011/.well-known/agent-card.json`
+- `search_hotels`: Find hotels by location, dates, price range, rating, amenities
+- `book_hotel`: Reserve a hotel room with guest details
 
 ### RestaurantFinder
-- `restaurant_search`: Discover dining options
-- `restaurant_reservation`: Make reservations
-- Filter by: cuisine, budget, dietary restrictions
+**A2A Endpoint**: `http://localhost:10012`
+**Agent Card**: `http://localhost:10012/.well-known/agent-card.json`
+- `find_restaurants`: Search restaurants by location, cuisine, budget, dietary needs
+- `make_reservation`: Book a table at a specific restaurant
 
 ### EventsFinder
-- `events_search`: Find local events & attractions
-- `activities`: Suggest things to do
-- Categories: concerts, museums, tours, festivals
+**A2A Endpoint**: `http://localhost:10013`
+**Agent Card**: `http://localhost:10013/.well-known/agent-card.json`
+- `find_events`: Discover local events, attractions, tours, museums, festivals
+- `book_event`: Purchase tickets for events and activities
 
 ## Architecture
 
@@ -117,12 +124,61 @@ Final Result
 ./stop_travel_agents.sh
 ```
 
+## A2A Protocol Features
+
+### JSON-RPC 2.0 Support
+All agents support JSON-RPC 2.0 requests:
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "message/send",
+  "params": {
+    "taskId": "optional-task-id",
+    "skill": "search_flights",
+    "messages": [
+      {
+        "role": "user",
+        "parts": [
+          {"type": "text", "text": "Find flights from LAX to Paris"},
+          {"type": "data", "data": {"origin": "LAX", "destination": "Paris"}}
+        ]
+      }
+    ]
+  },
+  "id": 1
+}
+```
+
+### Task Lifecycle
+- **submitted**: Task received
+- **working**: Agent processing
+- **input-required**: Needs user input (human-in-the-loop)
+- **completed**: Task finished successfully
+- **failed**: Task failed with error
+- **canceled**: Task canceled by user
+
+### Server-Sent Events (SSE)
+Stream task updates in real-time:
+```
+GET http://localhost:10010/stream/{taskId}
+```
+
+### Agent Discovery
+Each agent exposes its capabilities via Agent Card:
+```
+GET http://localhost:10010/.well-known/agent-card.json
+```
+
+### Backwards Compatibility
+Legacy `/execute` endpoint maintained for existing integrations.
+
 ## Next Steps
 
-1. **Deploy agents**: Host agents as microservices
+1. **Deploy agents**: Host agents as microservices on Railway/Cloud Run
 2. **Add real APIs**: Integrate with Amadeus (flights), Booking.com (hotels), etc.
-3. **Enhanced UI**: Show agent discovery and orchestration in real-time
+3. **Enhanced UI**: Show agent discovery and A2A protocol in real-time
 4. **More agents**: Car rental, insurance, currency exchange
+5. **Agent-to-Agent**: Enable agents to call each other via A2A protocol
 
 ---
 
