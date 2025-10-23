@@ -116,8 +116,6 @@ export default function ChatPage() {
         setStreaming(false);
         websocket.close();
       };
-
-      setWs(websocket);
     } catch (error) {
       console.error("Chat error:", error);
       setStreaming(false);
