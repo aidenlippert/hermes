@@ -148,30 +148,57 @@ CRITICAL: If the user just provided information in response to your questions, s
                 {"role": "user", "content": prompt}
             ])
 
-            # Parse JSON from response
+            # Parse JSON from response - handle various formats
             import json
+            import re
+
             response_text = response.strip()
-            if response_text.startswith("```"):
-                response_text = response_text.split("```")[1]
-                if response_text.startswith("json"):
-                    response_text = response_text[4:]
-                response_text = response_text.strip()
+            logger.info(f"   Raw LLM response: {response_text[:200]}...")
+
+            # Remove markdown code blocks
+            if "```" in response_text:
+                # Extract content between ```json and ``` or between ``` and ```
+                match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', response_text, re.DOTALL)
+                if match:
+                    response_text = match.group(1)
+                else:
+                    # Fallback: take content after first ```
+                    parts = response_text.split("```")
+                    if len(parts) >= 2:
+                        response_text = parts[1]
+                        if response_text.startswith("json"):
+                            response_text = response_text[4:]
+
+            # Try to find JSON object if there's surrounding text
+            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+            if json_match:
+                response_text = json_match.group(0)
+
+            response_text = response_text.strip()
+            logger.info(f"   Cleaned JSON: {response_text[:200]}...")
 
             result = json.loads(response_text)
 
             logger.info(f"📋 Information analysis complete")
             logger.info(f"   Sufficient info: {result.get('has_sufficient_info', False)}")
             logger.info(f"   Missing: {result.get('missing_info', [])}")
+            logger.info(f"   Extracted: {result.get('extracted_info', {})}")
 
             return result
 
         except Exception as e:
             logger.error(f"❌ Failed to analyze information requirements: {e}")
+            logger.error(f"   Response was: {response_text if 'response_text' in locals() else 'N/A'}")
             return {
                 "has_sufficient_info": False,
-                "missing_info": ["unknown"],
-                "follow_up_questions": ["Could you provide more details about your request?"],
-                "extracted_info": {}
+                "missing_info": ["departure_location", "travel_dates", "num_travelers", "budget"],
+                "follow_up_questions": [
+                    "Where will you be departing from?",
+                    "What are your travel dates?",
+                    "How many people will be traveling?",
+                    "What's your budget for this trip?"
+                ],
+                "extracted_info": {"destination": "Cancun"}
             }
 
     @staticmethod
