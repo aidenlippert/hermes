@@ -24,34 +24,30 @@ async def register_agents():
         {
             "name": "FlightBooker",
             "description": "Search and book flights worldwide. I can find the best deals based on your dates, budget, and preferences.",
-            "endpoint": "http://localhost:10010/execute",
-            "capabilities": ["flight_search", "flight_booking", "price_comparison", "travel"],
-            "category": "travel",
-            "version": "1.0.0"
+            "endpoint": "http://localhost:10010",
+            "capabilities": ["flight_search", "flight_booking", "price_comparison", "travel", "book_flight"],
+            "category": "travel"
         },
         {
             "name": "HotelBooker",
             "description": "Find and book hotels worldwide. I can search by location, price range, amenities, and ratings.",
-            "endpoint": "http://localhost:10011/execute",
-            "capabilities": ["hotel_search", "hotel_booking", "accommodation", "travel"],
-            "category": "travel",
-            "version": "1.0.0"
+            "endpoint": "http://localhost:10011",
+            "capabilities": ["hotel_search", "hotel_booking", "accommodation", "travel", "book_hotel"],
+            "category": "travel"
         },
         {
             "name": "RestaurantFinder",
             "description": "Discover amazing restaurants and make reservations. I can find dining options based on cuisine, location, budget, and dietary preferences.",
-            "endpoint": "http://localhost:10012/execute",
+            "endpoint": "http://localhost:10012",
             "capabilities": ["restaurant_search", "restaurant_reservation", "dining", "food", "travel"],
-            "category": "travel",
-            "version": "1.0.0"
+            "category": "travel"
         },
         {
             "name": "EventsFinder",
             "description": "Discover local events, attractions, and activities. I can find concerts, shows, tours, museums, and unique experiences.",
-            "endpoint": "http://localhost:10013/execute",
+            "endpoint": "http://localhost:10013",
             "capabilities": ["events_search", "activities", "attractions", "entertainment", "travel"],
-            "category": "travel",
-            "version": "1.0.0"
+            "category": "travel"
         }
     ]
 
@@ -66,8 +62,7 @@ async def register_agents():
                     description=agent_data["description"],
                     endpoint=agent_data["endpoint"],
                     capabilities=agent_data["capabilities"],
-                    category=agent_data["category"],
-                    version=agent_data["version"]
+                    category=agent_data["category"]
                 )
 
                 print(f"✅ {agent.name}")

@@ -39,6 +39,7 @@ from backend.services.agent_registry import AgentRegistry
 from backend.services.conversation import ConversationService
 from backend.services.task_service import TaskService
 from backend.services.conductor import ConductorService
+from backend.services.seed_agents import seed_travel_agents
 from backend.websocket.manager import manager
 from backend.api import v1_websocket
 
@@ -648,6 +649,14 @@ async def startup():
         logger.info("✅ Redis initialized")
     except Exception as e:
         logger.error(f"❌ Redis init failed: {e}")
+
+    # Seed travel agents
+    try:
+        from backend.database.connection import AsyncSessionLocal
+        async with AsyncSessionLocal() as db:
+            await seed_travel_agents(db)
+    except Exception as e:
+        logger.error(f"❌ Agent seeding failed: {e}")
 
     logger.info("✅ Hermes Platform Ready!")
 
