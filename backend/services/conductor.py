@@ -76,6 +76,13 @@ class ConductorService:
                 "extracted_info": Dict[str, Any]
             }
         """
+        logger.info("📋 Analyzing information requirements...")
+        logger.info(f"   Current query: '{user_query[:100]}'")
+        if conversation_history:
+            logger.info(f"   Conversation history: {len(conversation_history)} messages")
+            for i, msg in enumerate(conversation_history[-3:]):
+                logger.info(f"      [{i}] {msg.get('role')}: {msg.get('content', '')[:80]}")
+
         llm = get_llm_provider()
 
         # Build analysis prompt
