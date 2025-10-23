@@ -163,16 +163,22 @@ class AgentRegistry:
                 USE_PGVECTOR = False
 
         if not USE_PGVECTOR:
-            # Fallback to text search
+            # Fallback to text search - search for ANY keyword match
             logger.info("   Using text-based search (pgvector disabled)")
-            search_pattern = f"%{query}%"
-            stmt = stmt.where(
-                or_(
-                    Agent.name.ilike(search_pattern),
-                    Agent.description.ilike(search_pattern),
-                    Agent.category.ilike(search_pattern)
-                )
-            )
+
+            # Split query into keywords and search for ANY match
+            keywords = query.lower().split()
+            search_conditions = []
+
+            for keyword in keywords:
+                pattern = f"%{keyword}%"
+                search_conditions.append(Agent.name.ilike(pattern))
+                search_conditions.append(Agent.description.ilike(pattern))
+                search_conditions.append(Agent.category.ilike(pattern))
+
+            if search_conditions:
+                stmt = stmt.where(or_(*search_conditions))
+
             stmt = stmt.order_by(Agent.average_rating.desc())
 
         # Limit results
