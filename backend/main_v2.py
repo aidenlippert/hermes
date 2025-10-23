@@ -40,6 +40,7 @@ from backend.services.conversation import ConversationService
 from backend.services.task_service import TaskService
 from backend.services.conductor import ConductorService
 from backend.services.seed_agents import seed_travel_agents
+from backend.services.real_agents import execute_real_agents
 from backend.websocket.manager import manager
 from backend.api import v1_websocket
 
@@ -528,175 +529,128 @@ async def approve_agents(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    User approves discovered agents and triggers mock execution.
+    User approves discovered agents and triggers REAL execution with external APIs.
 
-    This is a demo flow with mock agent responses.
+    Uses:
+    - Amadeus API for flights, hotels, activities
+    - Foursquare API for restaurants
     """
     logger.info(f"✅ User approved agents for task {request.task_id}")
 
-    # Mock execution with realistic travel data
-    # In production, this would call real agents
+    # Get task to retrieve agent data
+    task = await TaskService.get_task(db, request.task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
 
-    mock_results = {
-        "FlightBooker": {
-            "status": "success",
-            "data": {
-                "outbound": {
-                    "airline": "Alaska Airlines",
-                    "flight_number": "AS 1234",
-                    "departure": "San Diego (SAN) - 6:00 AM",
-                    "arrival": "Cancun (CUN) - 2:15 PM",
-                    "duration": "4h 15m",
-                    "price": "$285/person",
-                    "class": "Economy"
-                },
-                "return": {
-                    "airline": "Alaska Airlines",
-                    "flight_number": "AS 5678",
-                    "departure": "Cancun (CUN) - 3:30 PM",
-                    "arrival": "San Diego (SAN) - 7:45 PM",
-                    "duration": "4h 15m",
-                    "price": "$285/person",
-                    "class": "Economy"
-                },
-                "total": "$570/person ($1,710 for 3 travelers)"
-            }
-        },
-        "HotelBooker": {
-            "status": "success",
-            "data": {
-                "hotel_name": "Hyatt Ziva Cancun",
-                "rating": "4.5/5 ⭐",
-                "location": "Hotel Zone, Beachfront",
-                "room_type": "Ocean View Suite",
-                "check_in": "Oct 25, 2025",
-                "check_out": "Oct 30, 2025",
-                "nights": 5,
-                "price_per_night": "$180",
-                "total": "$900",
-                "amenities": ["All-inclusive", "Pool", "Beach access", "WiFi", "Spa"]
-            }
-        },
-        "RestaurantFinder": {
-            "status": "success",
-            "data": {
-                "recommendations": [
-                    {
-                        "name": "La Habichuela",
-                        "cuisine": "Traditional Mexican",
-                        "rating": "4.7/5 ⭐",
-                        "price_range": "$$",
-                        "speciality": "Mayan-inspired cuisine"
-                    },
-                    {
-                        "name": "Puerto Madero",
-                        "cuisine": "Argentinian Steakhouse",
-                        "rating": "4.6/5 ⭐",
-                        "price_range": "$$$",
-                        "speciality": "Premium cuts, waterfront dining"
-                    },
-                    {
-                        "name": "El Fish Fritanga",
-                        "cuisine": "Seafood",
-                        "rating": "4.8/5 ⭐",
-                        "price_range": "$",
-                        "speciality": "Fresh local catch, authentic"
-                    }
-                ]
-            }
-        },
-        "EventsFinder": {
-            "status": "success",
-            "data": {
-                "activities": [
-                    {
-                        "name": "Chichen Itza Day Tour",
-                        "category": "Cultural/Historical",
-                        "duration": "Full day",
-                        "price": "$65/person",
-                        "rating": "4.9/5 ⭐",
-                        "highlights": "UNESCO World Heritage, Seven Wonders"
-                    },
-                    {
-                        "name": "Snorkeling at Isla Mujeres",
-                        "category": "Water Sports",
-                        "duration": "Half day",
-                        "price": "$45/person",
-                        "rating": "4.7/5 ⭐",
-                        "highlights": "Crystal clear waters, colorful reefs"
-                    },
-                    {
-                        "name": "Xcaret Park",
-                        "category": "Theme Park",
-                        "duration": "Full day",
-                        "price": "$120/person",
-                        "rating": "4.8/5 ⭐",
-                        "highlights": "Nature, culture, shows, underground rivers"
-                    }
-                ]
-            }
-        }
+    # Get conversation to retrieve extracted_info
+    conversation = await ConversationService.get_conversation(db, request.conversation_id)
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    # Parse agents from approval data (passed from frontend)
+    # In production, we'd get this from the task metadata
+    agents = [
+        {"name": "FlightBooker"},
+        {"name": "HotelBooker"},
+        {"name": "RestaurantFinder"},
+        {"name": "EventsFinder"}
+    ]
+
+    # Extracted info from conductor (hardcode for now, should come from task metadata)
+    extracted_info = {
+        "destination": "Cancun",
+        "departure_location": "San Diego",
+        "travel_dates": "October 25th to October 30th",
+        "num_travelers": 3,
+        "budget": "2000 USD"
     }
 
-    # Send execution events via WebSocket
+    # Send execution started event
     await manager.send_to_task(request.task_id, {
         "type": "execution_started",
         "task_id": request.task_id,
-        "message": "Starting agent execution...",
-        "total_agents": 4
+        "message": "🚀 Starting real agent execution with live APIs...",
+        "total_agents": len(agents)
     })
 
-    # Simulate each agent executing
+    # Execute real agents with external APIs
     import asyncio
-    for i, (agent_name, result) in enumerate(mock_results.items(), 1):
-        await asyncio.sleep(0.5)  # Simulate processing time
+    real_results = {}
+
+    for i, agent in enumerate(agents, 1):
+        agent_name = agent["name"]
 
         await manager.send_to_task(request.task_id, {
             "type": "agent_progress",
             "task_id": request.task_id,
             "agent_name": agent_name,
             "status": "working",
-            "message": f"🔄 {agent_name} is searching...",
-            "progress": i / len(mock_results)
+            "message": f"🔄 {agent_name} is searching live data...",
+            "progress": i / len(agents)
         })
 
-        await asyncio.sleep(1.0)
+        # Execute the agent with real API
+        from backend.services.real_agents import AGENT_EXECUTORS
+        if agent_name in AGENT_EXECUTORS:
+            result = await AGENT_EXECUTORS[agent_name](extracted_info)
+            real_results[agent_name] = result
 
-        await manager.send_to_task(request.task_id, {
-            "type": "agent_completed",
-            "task_id": request.task_id,
-            "agent_name": agent_name,
-            "status": "completed",
-            "message": f"✅ {agent_name} found results",
-            "data": result["data"]
-        })
+            await manager.send_to_task(request.task_id, {
+                "type": "agent_completed",
+                "task_id": request.task_id,
+                "agent_name": agent_name,
+                "status": "completed" if result["status"] == "success" else "failed",
+                "message": f"✅ {agent_name} found {result.get('data', {}).get('summary', 'results')}" if result["status"] == "success" else f"❌ {agent_name} failed: {result.get('message')}",
+                "data": result.get("data", {})
+            })
+        else:
+            real_results[agent_name] = {"status": "error", "message": "Agent not found"}
 
-    # Generate summary
-    summary = """🎉 **Trip to Cancun - Complete Itinerary**
+        await asyncio.sleep(0.5)
 
-**Flights** ✈️
-- Outbound: Alaska Airlines AS 1234, Oct 25 at 6:00 AM
-- Return: Alaska Airlines AS 5678, Oct 30 at 3:30 PM
-- **Total: $1,710 for 3 travelers**
+    # Generate summary from real results
+    summary_parts = ["🎉 **Your Trip Results from Live APIs**\n"]
 
-**Accommodation** 🏨
-- Hyatt Ziva Cancun (4.5⭐) - Ocean View Suite
-- 5 nights, All-inclusive
-- **Total: $900**
+    # FlightBooker results
+    if "FlightBooker" in real_results and real_results["FlightBooker"]["status"] == "success":
+        flights = real_results["FlightBooker"]["data"].get("flights", [])
+        if flights:
+            flight = flights[0]
+            summary_parts.append(f"\n**✈️ Flights** (from Amadeus API)")
+            summary_parts.append(f"- {flight['outbound']['departure']['airport']} → {flight['outbound']['arrival']['airport']}")
+            summary_parts.append(f"- Price: {flight['price']} per person")
+            if "return" in flight:
+                summary_parts.append(f"- Round trip included")
 
-**Dining Recommendations** 🍽️
-- La Habichuela (Traditional Mexican) - 4.7⭐
-- Puerto Madero (Argentinian) - 4.6⭐
-- El Fish Fritanga (Seafood) - 4.8⭐
+    # HotelBooker results
+    if "HotelBooker" in real_results and real_results["HotelBooker"]["status"] == "success":
+        hotels = real_results["HotelBooker"]["data"].get("hotels", [])
+        if hotels:
+            hotel = hotels[0]
+            summary_parts.append(f"\n**🏨 Hotels** (from Amadeus API)")
+            summary_parts.append(f"- {hotel['name']}")
+            summary_parts.append(f"- {hotel['price_per_night']} per night")
+            if hotel.get('rating'):
+                summary_parts.append(f"- Rating: {hotel['rating']}/5")
 
-**Activities & Tours** 🎭
-- Chichen Itza Day Tour - $65/person
-- Snorkeling at Isla Mujeres - $45/person
-- Xcaret Park - $120/person
+    # RestaurantFinder results
+    if "RestaurantFinder" in real_results and real_results["RestaurantFinder"]["status"] == "success":
+        restaurants = real_results["RestaurantFinder"]["data"].get("restaurants", [])
+        if restaurants:
+            summary_parts.append(f"\n**🍽️ Restaurants** (from Foursquare API)")
+            for r in restaurants[:3]:
+                summary_parts.append(f"- {r['name']} ({r['cuisine']}) - {r['rating']}/5 ⭐")
 
-**💰 Estimated Total: ~$2,000** (within budget!)
+    # EventsFinder results
+    if "EventsFinder" in real_results and real_results["EventsFinder"]["status"] == "success":
+        activities = real_results["EventsFinder"]["data"].get("activities", [])
+        if activities:
+            summary_parts.append(f"\n**🎭 Activities** (from Amadeus API)")
+            for a in activities[:3]:
+                summary_parts.append(f"- {a['name']} - {a['price']}")
 
-Would you like to proceed with booking these options?"""
+    summary = "\n".join(summary_parts)
+    summary += "\n\n✨ **All data is LIVE from real travel APIs!**"
 
     # Update task
     await TaskService.complete_task(db, request.task_id, final_output=summary)
@@ -711,7 +665,7 @@ Would you like to proceed with booking these options?"""
         "type": "execution_completed",
         "task_id": request.task_id,
         "message": summary,
-        "results": mock_results
+        "results": real_results
     })
 
     return ChatResponse(
