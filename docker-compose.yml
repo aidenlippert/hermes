@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  # PostgreSQL with pgvector for semantic search
+  postgres:
+    image: ankane/pgvector:latest
+    container_name: hermes_postgres
+    environment:
+      POSTGRES_USER: hermes
+      POSTGRES_PASSWORD: hermes_dev_password
+      POSTGRES_DB: hermes
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hermes"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis for caching and real-time pub/sub
+  redis:
+    image: redis:7-alpine
+    container_name: hermes_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --requirepass hermes_dev_password
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # pgAdmin for database management (optional, for development)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: hermes_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@hermes.ai
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    profiles:
+      - dev
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  default:
+    name: hermes_network
