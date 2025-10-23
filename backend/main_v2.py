@@ -524,7 +524,7 @@ async def chat(
 @app.post("/api/v1/chat/approve", response_model=ChatResponse)
 async def approve_agents(
     request: ApprovalRequest,
-    current_user: User = Depends(AuthService.get_current_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """
