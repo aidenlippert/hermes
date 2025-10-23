@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Send, Loader2, Sparkles, User2, LogOut, Menu } from "lucide-react";
+import { Send, Loader2, Sparkles, User2, LogOut, Menu, Search, DollarSign, Star } from "lucide-react";
 import { useAuthStore, useChatStore } from "@/lib/store";
 import { api, createWebSocket } from "@/lib/api";
 import { useRouter } from "next/navigation";
@@ -13,7 +13,9 @@ export default function ChatPage() {
 
   const [input, setInput] = useState("");
   const [streamingText, setStreamingText] = useState("");
-  const [currentAgents, setCurrentAgents] = useState<string[]>([]);
+  const [currentAgents, setCurrentAgents] = useState<any[]>([]);
+  const [discoveryPhase, setDiscoveryPhase] = useState<string | null>(null);
+  const [executionSteps, setExecutionSteps] = useState<any[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -71,6 +73,8 @@ export default function ChatPage() {
     setInput("");
     setStreaming(true);
     setCurrentAgents([]);
+    setDiscoveryPhase(null);
+    setExecutionSteps([]);
 
     try {
       const response = await api.chat.send({ query: input }, token);
@@ -86,17 +90,67 @@ export default function ChatPage() {
         const data = JSON.parse(event.data);
         addEvent(data);
 
-        if (data.type === "agent_selected") {
-          setCurrentAgents((prev) => [...prev, data.agent_name]);
+        // Intent parsed
+        if (data.type === "intent_parsed") {
+          setDiscoveryPhase("Analyzing request...");
         }
 
+        // Agents discovered
+        if (data.type === "agents_discovered") {
+          setDiscoveryPhase("Agents discovered!");
+          setCurrentAgents(data.agents || []);
+        }
+
+        // Follow-up questions
+        if (data.type === "follow_up_required") {
+          setDiscoveryPhase(null);
+          setCurrentAgents([]);
+          simulateTokenStreaming(data.message);
+          websocket.close();
+          return;
+        }
+
+        // Plan created
+        if (data.type === "plan_created") {
+          setDiscoveryPhase("Executing plan...");
+          setExecutionSteps(data.steps || []);
+        }
+
+        // Agent execution events
+        if (data.type === "agent_selected") {
+          setExecutionSteps(prev =>
+            prev.map(step =>
+              step.agent === data.agent_name
+                ? { ...step, status: "executing" }
+                : step
+            )
+          );
+        }
+
+        if (data.type === "agent_result") {
+          setExecutionSteps(prev =>
+            prev.map(step =>
+              step.agent === data.agent_name
+                ? { ...step, status: "completed", result: data.result }
+                : step
+            )
+          );
+        }
+
+        // Task completed
         if (data.type === "task_completed") {
+          setDiscoveryPhase(null);
+          setCurrentAgents([]);
+          setExecutionSteps([]);
           const result = data.final_output || response.result;
           if (result) {
             simulateTokenStreaming(result);
           }
           websocket.close();
         } else if (data.type === "task_failed") {
+          setDiscoveryPhase(null);
+          setCurrentAgents([]);
+          setExecutionSteps([]);
           addMessage({
             id: Date.now().toString(),
             role: "assistant",
@@ -236,20 +290,97 @@ export default function ChatPage() {
               </div>
             )}
 
-            {/* Agent Discovery */}
+            {/* Discovery Phase */}
+            {discoveryPhase && (
+              <div className="flex gap-4 animate-in">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center flex-shrink-0">
+                  <Search className="w-4 h-4 text-white" />
+                </div>
+                <div className="rounded-2xl px-4 py-3 bg-muted text-foreground">
+                  <p className="text-sm font-medium">{discoveryPhase}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Agent Discovery Cards */}
             {currentAgents.length > 0 && (
               <div className="flex gap-4 animate-in">
                 <div className="w-8 h-8" />
-                <div className="flex flex-wrap gap-2">
-                  {currentAgents.map((agent, i) => (
-                    <div
-                      key={i}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-accent rounded-full text-xs font-medium text-accent-foreground"
-                    >
-                      <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                      {agent}
-                    </div>
-                  ))}
+                <div className="w-full max-w-2xl">
+                  <p className="text-sm font-medium text-muted-foreground mb-3">
+                    🔍 Found {currentAgents.length} specialized agents:
+                  </p>
+                  <div className="grid grid-cols-1 gap-3">
+                    {currentAgents.map((agent, i) => (
+                      <div
+                        key={i}
+                        className="p-4 bg-background border border-border rounded-xl hover:border-primary/50 transition-all cursor-pointer group"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Sparkles className="w-4 h-4 text-primary" />
+                              <h4 className="font-semibold text-sm">{agent.name}</h4>
+                            </div>
+                            <p className="text-xs text-muted-foreground mb-2">
+                              {agent.capabilities?.join(", ") || "No capabilities listed"}
+                            </p>
+                            {/* Coming soon - price and rating */}
+                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                              <div className="flex items-center gap-1">
+                                <DollarSign className="w-3 h-3" />
+                                <span>Coming Soon</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Star className="w-3 h-3" />
+                                <span>Coming Soon</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-xs text-primary group-hover:underline">
+                            View Similar
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Execution Steps */}
+            {executionSteps.length > 0 && (
+              <div className="flex gap-4 animate-in">
+                <div className="w-8 h-8" />
+                <div className="w-full max-w-2xl">
+                  <p className="text-sm font-medium text-muted-foreground mb-3">
+                    ⚡ Execution Progress:
+                  </p>
+                  <div className="space-y-2">
+                    {executionSteps.map((step, i) => (
+                      <div
+                        key={i}
+                        className={`p-3 rounded-lg border ${
+                          step.status === "completed"
+                            ? "bg-primary/5 border-primary/30"
+                            : step.status === "executing"
+                            ? "bg-accent border-accent-foreground/30"
+                            : "bg-muted border-border"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 text-sm">
+                          {step.status === "completed" ? (
+                            <span className="text-primary">✓</span>
+                          ) : step.status === "executing" ? (
+                            <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                          ) : (
+                            <span className="text-muted-foreground">○</span>
+                          )}
+                          <span className="font-medium">{step.agent || step.description}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}

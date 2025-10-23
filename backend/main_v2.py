@@ -38,6 +38,7 @@ from backend.services.auth import AuthService
 from backend.services.agent_registry import AgentRegistry
 from backend.services.conversation import ConversationService
 from backend.services.task_service import TaskService
+from backend.services.conductor import ConductorService
 from backend.websocket.manager import manager
 from backend.api import v1_websocket
 
@@ -349,66 +350,72 @@ async def chat(
         parsed_intent = await intent_parser.parse(request.query)
         await TaskService.update_task_intent(db, task.id, parsed_intent.to_dict())
 
-        # STEP 2: Get Available Agents from Database
-        logger.info("🔍 Finding agents...")
+        # Send intent parsed event
+        await manager.send_to_task(task.id, {
+            "type": "intent_parsed",
+            "task_id": task.id,
+            "intent": parsed_intent.to_dict()
+        })
 
-        if parsed_intent.required_capabilities:
-            agents = await AgentRegistry.search_by_capabilities(
-                db, parsed_intent.required_capabilities, limit=5
-            )
-        else:
-            # Semantic search as fallback
-            agents = await AgentRegistry.semantic_search(db, request.query, limit=5)
+        # STEP 2: Get conversation history for context
+        conversation_messages = await ConversationService.get_conversation_messages(db, conversation_id)
+        history = [
+            {"role": msg.role, "content": msg.content}
+            for msg in conversation_messages[-10:]  # Last 10 messages
+        ]
 
-        if not agents:
-            # No agents - respond directly with LLM
-            logger.info("⚠️ No agents found, responding directly with LLM")
+        # STEP 3: Orchestrate with Conductor
+        logger.info("🎭 Conductor analyzing request...")
+        response_message, execution_plan = await ConductorService.orchestrate_request(
+            db,
+            request.query,
+            parsed_intent.to_dict(),
+            history
+        )
 
-            from backend.services.llm_provider import get_llm_provider
-            llm = get_llm_provider()
+        # Send agent discovery event if agents were found
+        if execution_plan and "agents" in execution_plan:
+            await manager.send_to_task(task.id, {
+                "type": "agents_discovered",
+                "task_id": task.id,
+                "agents": execution_plan["agents"],
+                "count": len(execution_plan["agents"])
+            })
 
-            # Get conversation history for context
-            conversation_messages = await ConversationService.get_conversation_messages(db, conversation_id)
-            messages = [
-                {"role": msg.role, "content": msg.content}
-                for msg in conversation_messages[-10:]  # Last 10 messages for context
-            ]
+        # Check if we need more information
+        if not execution_plan:
+            # Conductor is asking follow-up questions
+            logger.info("❓ Asking follow-up questions...")
 
-            # Generate response
-            response_text = await llm.chat_completion(messages)
-
-            # Update task
-            await TaskService.complete_task(db, task.id, final_output=response_text)
+            # Update task as waiting for input
+            await TaskService.complete_task(db, task.id, final_output=response_message)
 
             # Add assistant message
             await ConversationService.add_message(
-                db, conversation_id, "assistant", response_text, task.id
+                db, conversation_id, "assistant", response_message, task.id
             )
 
-            logger.info("✅ Direct LLM response sent")
+            # Send follow-up question event
+            await manager.send_to_task(task.id, {
+                "type": "follow_up_required",
+                "task_id": task.id,
+                "message": response_message
+            })
 
             return ChatResponse(
                 task_id=task.id,
                 conversation_id=conversation_id,
-                status="completed",
-                message="Responded with direct LLM",
-                result=response_text,
+                status="awaiting_input",
+                message="Follow-up questions asked",
+                result=response_message,
                 steps=[]
             )
 
-        # Convert to format planner expects
-        available_agents = [
-            {
-                "name": agent.name,
-                "endpoint": agent.endpoint,
-                "capabilities": agent.capabilities,
-                "description": agent.description
-            }
-            for agent in agents
-        ]
-
-        # STEP 3: Create Plan
+        # STEP 4: We have execution plan - create workflow plan
         logger.info("📋 Creating execution plan...")
+
+        available_agents = execution_plan["agents"]
+
         plan = await planner.create_plan(
             user_query=request.query,
             parsed_intent=parsed_intent.to_dict(),
@@ -417,7 +424,15 @@ async def chat(
 
         await TaskService.update_task_plan(db, task.id, plan.to_dict(), len(plan.steps))
 
-        # STEP 4: Execute Plan (with real-time WebSocket streaming!)
+        # Send plan created event
+        await manager.send_to_task(task.id, {
+            "type": "plan_created",
+            "task_id": task.id,
+            "steps": [step.to_dict() for step in plan.steps],
+            "total_steps": len(plan.steps)
+        })
+
+        # STEP 5: Execute Plan (with real-time WebSocket streaming!)
         logger.info("⚡ Executing plan...")
         result = await executor.execute(plan, task.id)
 
