@@ -109,8 +109,9 @@ EXTRACTION RULES:
 1. Look in BOTH current request AND conversation history
 2. "just me" = 1 traveler, "solo" = 1 traveler
 3. "sfo" = San Francisco, "lax" = Los Angeles
-4. "25th to 31st" = valid dates
+4. "25th to 31st" = valid dates, "cot" = "oct" (typo), "dec" = December
 5. "$1000" or "1000 dollars" = valid budget
+6. FIX TYPOS: "cot 25" → "October 25", "nov 3rd" → "November 3rd"
 
 EXAMPLES:
 ❌ WRONG: User said "departing from sfo" → you say "missing departure_location"
@@ -121,6 +122,9 @@ EXAMPLES:
 
 ❌ WRONG: User said "1000 dollars usd" → you say "missing budget"
 ✅ RIGHT: User said "1000 dollars usd" → "budget": "1000 USD"
+
+❌ WRONG: User said "cot 25 to 31" → "travel_dates": "cot 25 to 31"
+✅ RIGHT: User said "cot 25 to 31" → "travel_dates": "October 25 to 31"
 
 Now extract from the conversation:
 - destination: city/country name from current request or history
