@@ -9,32 +9,85 @@ Executes travel agents using real API integrations:
 """
 
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from backend.services.amadeus_api import AmadeusService
 from backend.services.foursquare_api import FoursquareService
+from backend.services.llm_provider import get_llm_provider
 
 logger = logging.getLogger(__name__)
 
-# Location coordinates for common destinations
-DESTINATION_COORDS = {
-    "cancun": {"lat": 21.1619, "lon": -86.8515, "airport": "CUN"},
-    "miami": {"lat": 25.7617, "lon": -80.1918, "airport": "MIA"},
-    "new york": {"lat": 40.7128, "lon": -74.0060, "airport": "JFK"},
-    "los angeles": {"lat": 34.0522, "lon": -118.2437, "airport": "LAX"},
-    "san diego": {"lat": 32.7157, "lon": -117.1611, "airport": "SAN"},
-    "seattle": {"lat": 47.6062, "lon": -122.3321, "airport": "SEA"},
-}
 
-AIRPORT_CODES = {
-    "san diego": "SAN",
-    "los angeles": "LAX",
-    "new york": "JFK",
-    "miami": "MIA",
-    "chicago": "ORD",
-    "boston": "BOS",
-    "san francisco": "SFO",
-    "seattle": "SEA",
-}
+async def resolve_location_info(location_name: str, is_destination: bool = True) -> Optional[Dict[str, Any]]:
+    """
+    Dynamically resolve airport code and coordinates for any location using LLM.
+
+    Args:
+        location_name: City or location name (e.g., "Seattle", "San Francisco", "Tokyo")
+        is_destination: True if this is a destination, False if it's a departure location
+
+    Returns:
+        Dictionary with airport code, latitude, and longitude, or None if failed
+    """
+    try:
+        llm = get_llm_provider()
+
+        prompt = f"""You are a travel data expert. For the location "{location_name}", provide the main airport code and coordinates.
+
+Return ONLY valid JSON in this exact format (no markdown, no explanation):
+{{
+    "airport": "XXX",
+    "latitude": 00.0000,
+    "longitude": -00.0000
+}}
+
+Examples:
+- Seattle → {{"airport": "SEA", "latitude": 47.6062, "longitude": -122.3321}}
+- San Francisco → {{"airport": "SFO", "latitude": 37.7749, "longitude": -122.4194}}
+- New York → {{"airport": "JFK", "latitude": 40.7128, "longitude": -74.0060}}
+- Tokyo → {{"airport": "NRT", "latitude": 35.6762, "longitude": 139.6503}}
+
+Now for: {location_name}"""
+
+        response = await llm.chat_completion([
+            {"role": "user", "content": prompt}
+        ], temperature=0.1)
+
+        # Parse JSON response
+        import json
+        import re
+
+        # Clean response
+        response_text = response.strip()
+
+        # Remove markdown code blocks if present
+        if "```" in response_text:
+            match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', response_text, re.DOTALL)
+            if match:
+                response_text = match.group(1)
+
+        # Extract JSON object
+        json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+        if json_match:
+            response_text = json_match.group(0)
+
+        location_info = json.loads(response_text.strip())
+
+        logger.info(f"📍 Resolved {location_name} → {location_info['airport']} ({location_info['latitude']}, {location_info['longitude']})")
+        return location_info
+
+    except Exception as e:
+        logger.error(f"❌ Failed to resolve location {location_name}: {e}")
+
+        # Fallback to common defaults
+        fallback_map = {
+            "san francisco": {"airport": "SFO", "latitude": 37.7749, "longitude": -122.4194},
+            "los angeles": {"airport": "LAX", "latitude": 34.0522, "longitude": -118.2437},
+            "new york": {"airport": "JFK", "latitude": 40.7128, "longitude": -74.0060},
+            "seattle": {"airport": "SEA", "latitude": 47.6062, "longitude": -122.3321},
+            "miami": {"airport": "MIA", "latitude": 25.7617, "longitude": -80.1918},
+        }
+
+        return fallback_map.get(location_name.lower())
 
 
 async def execute_flight_booker(extracted_info: Dict[str, Any]) -> Dict[str, Any]:
@@ -48,15 +101,26 @@ async def execute_flight_booker(extracted_info: Dict[str, Any]) -> Dict[str, Any
         Flight search results
     """
     try:
-        destination = extracted_info.get("destination", "").lower()
-        departure_location = extracted_info.get("departure_location", "").lower()
+        destination = extracted_info.get("destination", "")
+        departure_location = extracted_info.get("departure_location", "")
         travel_dates = extracted_info.get("travel_dates", "")
         num_travelers = extracted_info.get("num_travelers", 1)
 
-        # Get airport codes
-        origin_code = AIRPORT_CODES.get(departure_location, "SAN")
-        dest_coords = DESTINATION_COORDS.get(destination, DESTINATION_COORDS["cancun"])
-        dest_code = dest_coords["airport"]
+        # Dynamically resolve airport codes and coordinates
+        logger.info(f"🔍 Resolving locations: {departure_location} → {destination}")
+
+        origin_info = await resolve_location_info(departure_location, is_destination=False)
+        dest_info = await resolve_location_info(destination, is_destination=True)
+
+        if not origin_info or not dest_info:
+            return {
+                "status": "error",
+                "message": f"Could not resolve airport codes for {departure_location} or {destination}",
+                "data": []
+            }
+
+        origin_code = origin_info["airport"]
+        dest_code = dest_info["airport"]
 
         # Parse dates (simplified - assumes format like "25th to 30th" or "October 25-30")
         # For demo, use hardcoded dates
@@ -109,12 +173,20 @@ async def execute_hotel_booker(extracted_info: Dict[str, Any]) -> Dict[str, Any]
         Hotel search results
     """
     try:
-        destination = extracted_info.get("destination", "").lower()
+        destination = extracted_info.get("destination", "")
         num_travelers = extracted_info.get("num_travelers", 1)
 
-        # Get destination city code
-        dest_coords = DESTINATION_COORDS.get(destination, DESTINATION_COORDS["cancun"])
-        city_code = dest_coords["airport"]
+        # Dynamically resolve destination info
+        dest_info = await resolve_location_info(destination, is_destination=True)
+
+        if not dest_info:
+            return {
+                "status": "error",
+                "message": f"Could not resolve location for {destination}",
+                "data": []
+            }
+
+        city_code = dest_info["airport"]
 
         # Parse dates
         check_in = "2025-10-25"
@@ -165,17 +237,24 @@ async def execute_restaurant_finder(extracted_info: Dict[str, Any]) -> Dict[str,
         Restaurant recommendations
     """
     try:
-        destination = extracted_info.get("destination", "").lower()
+        destination = extracted_info.get("destination", "")
 
-        # Get destination coordinates
-        dest_coords = DESTINATION_COORDS.get(destination, DESTINATION_COORDS["cancun"])
+        # Dynamically resolve destination coordinates
+        dest_info = await resolve_location_info(destination, is_destination=True)
+
+        if not dest_info:
+            return {
+                "status": "error",
+                "message": f"Could not resolve location for {destination}",
+                "data": []
+            }
 
         logger.info(f"🍽️ Searching restaurants in {destination}")
 
         restaurants = await FoursquareService.search_restaurants(
             location=destination.title(),
-            latitude=dest_coords["lat"],
-            longitude=dest_coords["lon"],
+            latitude=dest_info["latitude"],
+            longitude=dest_info["longitude"],
             limit=10
         )
 
@@ -189,7 +268,7 @@ async def execute_restaurant_finder(extracted_info: Dict[str, Any]) -> Dict[str,
         return {
             "status": "success",
             "data": {
-                "restaurants": restaurants[:5],  # Top 5
+                "restaurants": restaurants[:5],
                 "summary": f"Found {len(restaurants)} restaurant recommendations in {destination.title()}"
             }
         }
@@ -214,16 +293,23 @@ async def execute_events_finder(extracted_info: Dict[str, Any]) -> Dict[str, Any
         Activities and tours
     """
     try:
-        destination = extracted_info.get("destination", "").lower()
+        destination = extracted_info.get("destination", "")
 
-        # Get destination coordinates
-        dest_coords = DESTINATION_COORDS.get(destination, DESTINATION_COORDS["cancun"])
+        # Dynamically resolve destination coordinates
+        dest_info = await resolve_location_info(destination, is_destination=True)
+
+        if not dest_info:
+            return {
+                "status": "error",
+                "message": f"Could not resolve location for {destination}",
+                "data": []
+            }
 
         logger.info(f"🎭 Searching activities in {destination}")
 
         activities = await AmadeusService.search_activities(
-            latitude=dest_coords["lat"],
-            longitude=dest_coords["lon"],
+            latitude=dest_info["latitude"],
+            longitude=dest_info["longitude"],
             radius=20,
             max_results=10
         )
@@ -238,7 +324,7 @@ async def execute_events_finder(extracted_info: Dict[str, Any]) -> Dict[str, Any
         return {
             "status": "success",
             "data": {
-                "activities": activities[:5],  # Top 5
+                "activities": activities[:5],
                 "summary": f"Found {len(activities)} activities and tours in {destination.title()}"
             }
         }
