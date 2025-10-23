@@ -202,6 +202,12 @@ class ChatResponse(BaseModel):
     extracted_info: Optional[Dict[str, Any]] = None
 
 
+class ApprovalRequest(BaseModel):
+    task_id: str
+    conversation_id: str
+    approved: bool = True
+
+
 class AgentSearchRequest(BaseModel):
     query: str
     category: Optional[str] = None
@@ -509,6 +515,209 @@ async def chat(
         await TaskService.complete_task(db, task.id, error_message=str(e))
 
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/v1/chat/approve", response_model=ChatResponse)
+async def approve_agents(
+    request: ApprovalRequest,
+    current_user: User = Depends(AuthService.get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    User approves discovered agents and triggers mock execution.
+
+    This is a demo flow with mock agent responses.
+    """
+    logger.info(f"✅ User approved agents for task {request.task_id}")
+
+    # Mock execution with realistic travel data
+    # In production, this would call real agents
+
+    mock_results = {
+        "FlightBooker": {
+            "status": "success",
+            "data": {
+                "outbound": {
+                    "airline": "Alaska Airlines",
+                    "flight_number": "AS 1234",
+                    "departure": "San Diego (SAN) - 6:00 AM",
+                    "arrival": "Cancun (CUN) - 2:15 PM",
+                    "duration": "4h 15m",
+                    "price": "$285/person",
+                    "class": "Economy"
+                },
+                "return": {
+                    "airline": "Alaska Airlines",
+                    "flight_number": "AS 5678",
+                    "departure": "Cancun (CUN) - 3:30 PM",
+                    "arrival": "San Diego (SAN) - 7:45 PM",
+                    "duration": "4h 15m",
+                    "price": "$285/person",
+                    "class": "Economy"
+                },
+                "total": "$570/person ($1,710 for 3 travelers)"
+            }
+        },
+        "HotelBooker": {
+            "status": "success",
+            "data": {
+                "hotel_name": "Hyatt Ziva Cancun",
+                "rating": "4.5/5 ⭐",
+                "location": "Hotel Zone, Beachfront",
+                "room_type": "Ocean View Suite",
+                "check_in": "Oct 25, 2025",
+                "check_out": "Oct 30, 2025",
+                "nights": 5,
+                "price_per_night": "$180",
+                "total": "$900",
+                "amenities": ["All-inclusive", "Pool", "Beach access", "WiFi", "Spa"]
+            }
+        },
+        "RestaurantFinder": {
+            "status": "success",
+            "data": {
+                "recommendations": [
+                    {
+                        "name": "La Habichuela",
+                        "cuisine": "Traditional Mexican",
+                        "rating": "4.7/5 ⭐",
+                        "price_range": "$$",
+                        "speciality": "Mayan-inspired cuisine"
+                    },
+                    {
+                        "name": "Puerto Madero",
+                        "cuisine": "Argentinian Steakhouse",
+                        "rating": "4.6/5 ⭐",
+                        "price_range": "$$$",
+                        "speciality": "Premium cuts, waterfront dining"
+                    },
+                    {
+                        "name": "El Fish Fritanga",
+                        "cuisine": "Seafood",
+                        "rating": "4.8/5 ⭐",
+                        "price_range": "$",
+                        "speciality": "Fresh local catch, authentic"
+                    }
+                ]
+            }
+        },
+        "EventsFinder": {
+            "status": "success",
+            "data": {
+                "activities": [
+                    {
+                        "name": "Chichen Itza Day Tour",
+                        "category": "Cultural/Historical",
+                        "duration": "Full day",
+                        "price": "$65/person",
+                        "rating": "4.9/5 ⭐",
+                        "highlights": "UNESCO World Heritage, Seven Wonders"
+                    },
+                    {
+                        "name": "Snorkeling at Isla Mujeres",
+                        "category": "Water Sports",
+                        "duration": "Half day",
+                        "price": "$45/person",
+                        "rating": "4.7/5 ⭐",
+                        "highlights": "Crystal clear waters, colorful reefs"
+                    },
+                    {
+                        "name": "Xcaret Park",
+                        "category": "Theme Park",
+                        "duration": "Full day",
+                        "price": "$120/person",
+                        "rating": "4.8/5 ⭐",
+                        "highlights": "Nature, culture, shows, underground rivers"
+                    }
+                ]
+            }
+        }
+    }
+
+    # Send execution events via WebSocket
+    await manager.send_to_task(request.task_id, {
+        "type": "execution_started",
+        "task_id": request.task_id,
+        "message": "Starting agent execution...",
+        "total_agents": 4
+    })
+
+    # Simulate each agent executing
+    import asyncio
+    for i, (agent_name, result) in enumerate(mock_results.items(), 1):
+        await asyncio.sleep(0.5)  # Simulate processing time
+
+        await manager.send_to_task(request.task_id, {
+            "type": "agent_progress",
+            "task_id": request.task_id,
+            "agent_name": agent_name,
+            "status": "working",
+            "message": f"🔄 {agent_name} is searching...",
+            "progress": i / len(mock_results)
+        })
+
+        await asyncio.sleep(1.0)
+
+        await manager.send_to_task(request.task_id, {
+            "type": "agent_completed",
+            "task_id": request.task_id,
+            "agent_name": agent_name,
+            "status": "completed",
+            "message": f"✅ {agent_name} found results",
+            "data": result["data"]
+        })
+
+    # Generate summary
+    summary = """🎉 **Trip to Cancun - Complete Itinerary**
+
+**Flights** ✈️
+- Outbound: Alaska Airlines AS 1234, Oct 25 at 6:00 AM
+- Return: Alaska Airlines AS 5678, Oct 30 at 3:30 PM
+- **Total: $1,710 for 3 travelers**
+
+**Accommodation** 🏨
+- Hyatt Ziva Cancun (4.5⭐) - Ocean View Suite
+- 5 nights, All-inclusive
+- **Total: $900**
+
+**Dining Recommendations** 🍽️
+- La Habichuela (Traditional Mexican) - 4.7⭐
+- Puerto Madero (Argentinian) - 4.6⭐
+- El Fish Fritanga (Seafood) - 4.8⭐
+
+**Activities & Tours** 🎭
+- Chichen Itza Day Tour - $65/person
+- Snorkeling at Isla Mujeres - $45/person
+- Xcaret Park - $120/person
+
+**💰 Estimated Total: ~$2,000** (within budget!)
+
+Would you like to proceed with booking these options?"""
+
+    # Update task
+    await TaskService.complete_task(db, request.task_id, final_output=summary)
+
+    # Add to conversation
+    await ConversationService.add_message(
+        db, request.conversation_id, "assistant", summary, request.task_id
+    )
+
+    # Send completion event
+    await manager.send_to_task(request.task_id, {
+        "type": "execution_completed",
+        "task_id": request.task_id,
+        "message": summary,
+        "results": mock_results
+    })
+
+    return ChatResponse(
+        task_id=request.task_id,
+        conversation_id=request.conversation_id,
+        status="completed",
+        message="Trip planning completed",
+        result=summary,
+        steps=[]
+    )
 
 
 # ============================================================================

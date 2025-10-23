@@ -19,6 +19,7 @@ export default function ChatPage() {
   const [awaitingApproval, setAwaitingApproval] = useState(false);
   const [approvalData, setApprovalData] = useState<any>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -63,11 +64,11 @@ export default function ChatPage() {
   };
 
   const handleApprove = async () => {
-    if (!token || !approvalData) return;
+    if (!token || !approvalData || !currentTaskId || !conversationId) return;
 
     setAwaitingApproval(false);
     setStreaming(true);
-    setDiscoveryPhase("Creating execution plan...");
+    setDiscoveryPhase("Executing agents...");
 
     // Send approval message
     const approvalMessage = {
@@ -79,9 +80,55 @@ export default function ChatPage() {
 
     addMessage(approvalMessage);
 
-    // This will trigger execution with approved agents
-    // For now we just continue - the backend will need an approval endpoint
-    // TODO: Create /api/v1/approve/{task_id} endpoint
+    try {
+      // Call approval endpoint
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/v1/chat/approve`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          task_id: currentTaskId,
+          conversation_id: conversationId,
+          approved: true
+        })
+      });
+
+      if (!response.ok) throw new Error("Approval failed");
+
+      // Connect to WebSocket for execution updates
+      const websocket = createWebSocket(currentTaskId, token);
+
+      websocket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        addEvent(data);
+
+        if (data.type === "execution_started") {
+          setDiscoveryPhase("Agents working...");
+        } else if (data.type === "agent_progress") {
+          setDiscoveryPhase(data.message);
+        } else if (data.type === "agent_completed") {
+          setExecutionSteps(prev => [...prev, data]);
+        } else if (data.type === "execution_completed") {
+          setDiscoveryPhase(null);
+          setCurrentAgents([]);
+          setExecutionSteps([]);
+          simulateTokenStreaming(data.message);
+          websocket.close();
+        }
+      };
+
+      websocket.onerror = () => {
+        setStreaming(false);
+        setDiscoveryPhase(null);
+        websocket.close();
+      };
+    } catch (error) {
+      console.error("Approval error:", error);
+      setStreaming(false);
+      setDiscoveryPhase(null);
+    }
   };
 
   const handleSend = async () => {
@@ -109,9 +156,12 @@ export default function ChatPage() {
         conversation_id: conversationId || undefined
       }, token);
 
-      // Save conversation ID for next message
+      // Save conversation ID and task ID for next operations
       if (response.conversation_id) {
         setConversationId(response.conversation_id);
+      }
+      if (response.task_id) {
+        setCurrentTaskId(response.task_id);
       }
 
       // Check if this is an awaiting_approval response
