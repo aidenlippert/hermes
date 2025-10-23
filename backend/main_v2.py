@@ -14,7 +14,7 @@ All the features we brainstormed - NOW WORKING!
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, validator
 from typing import Optional, List, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 import logging
@@ -153,10 +153,26 @@ class RegisterRequest(BaseModel):
     full_name: Optional[str] = None
     username: Optional[str] = None
 
+    @validator('password')
+    def truncate_password(cls, v):
+        """Truncate password to 72 bytes for bcrypt"""
+        if isinstance(v, str):
+            password_bytes = v.encode('utf-8')[:72]
+            return password_bytes.decode('utf-8', errors='ignore')
+        return v
+
 
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+
+    @validator('password')
+    def truncate_password(cls, v):
+        """Truncate password to 72 bytes for bcrypt"""
+        if isinstance(v, str):
+            password_bytes = v.encode('utf-8')[:72]
+            return password_bytes.decode('utf-8', errors='ignore')
+        return v
 
 
 class TokenResponse(BaseModel):
