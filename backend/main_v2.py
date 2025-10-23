@@ -898,23 +898,30 @@ async def startup():
     logger.info("🚀 Hermes Platform Starting...")
 
     try:
-        # Initialize database
+        # Initialize database with timeout
         try:
-            await init_db()
+            import asyncio
+            await asyncio.wait_for(init_db(), timeout=10.0)
             logger.info("✅ PostgreSQL initialized")
+        except asyncio.TimeoutError:
+            logger.error("❌ PostgreSQL init timed out after 10s")
+            raise
         except Exception as e:
             logger.error(f"❌ PostgreSQL init failed: {e}")
             raise
 
-        # Initialize Redis
+        # Initialize Redis with timeout
         try:
-            await init_redis()
+            await asyncio.wait_for(init_redis(), timeout=5.0)
             logger.info("✅ Redis initialized")
+        except asyncio.TimeoutError:
+            logger.error("❌ Redis init timed out after 5s")
+            raise
         except Exception as e:
             logger.error(f"❌ Redis init failed: {e}")
             raise
 
-        # Seed travel agents
+        # Seed travel agents (non-blocking)
         try:
             from backend.database.connection import AsyncSessionLocal
             async with AsyncSessionLocal() as db:
@@ -930,6 +937,8 @@ async def startup():
     except Exception as e:
         startup_error = e
         logger.error(f"❌ Startup failed: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         # Don't raise - let the app start in degraded mode
 
 
