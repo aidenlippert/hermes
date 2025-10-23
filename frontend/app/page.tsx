@@ -1,138 +1,65 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
-import { MessageSquare, Zap, Users, TrendingUp, ArrowRight, Sparkles } from "lucide-react";
+import { Circle, ArrowRight } from "lucide-react";
 
 export default function HomePage() {
   const router = useRouter();
 
-  const features = [
-    {
-      icon: Zap,
-      title: "Real-Time Streaming",
-      description: "Watch AI agents work in real-time with WebSocket updates",
-    },
-    {
-      icon: Users,
-      title: "Multi-Agent Coordination",
-      description: "Orchestrate multiple agents to solve complex tasks",
-    },
-    {
-      icon: MessageSquare,
-      title: "Natural Language",
-      description: "Just describe what you need - Hermes handles the rest",
-    },
-    {
-      icon: TrendingUp,
-      title: "Smart Routing",
-      description: "Intelligent agent selection using semantic search",
-    },
-  ];
-
   return (
-    <div className="min-h-screen">
-      {/* Hero Section */}
-      <div className="relative overflow-hidden">
-        {/* Gradient Background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-primary-100/20 via-accent-100/20 to-purple-100/20 animate-gradient-slow" />
+    <div className="min-h-screen bg-white flex flex-col items-center justify-center px-6">
+      <div className="max-w-2xl mx-auto text-center">
+        {/* Logo */}
+        <div className="mb-8 flex items-center justify-center gap-3">
+          <Circle className="w-8 h-8 text-accent" fill="currentColor" />
+          <h1 className="text-3xl font-semibold text-slate-900">Hermes</h1>
+        </div>
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-          {/* Logo/Brand */}
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="text-center mb-16"
-          >
-            <div className="inline-flex items-center gap-3 glass-effect px-6 py-3 rounded-full mb-6">
-              <Sparkles className="w-5 h-5 text-primary-600" />
-              <span className="text-sm font-medium text-slate-700">
-                The Operating System for AI Agent Orchestration
-              </span>
-            </div>
-            <h1 className="text-6xl md:text-7xl font-bold mb-6 gradient-text">
-              Hermes
-            </h1>
-            <p className="text-xl md:text-2xl text-slate-600 max-w-3xl mx-auto">
-              Transform natural language into intelligent multi-agent workflows. Real-time coordination powered by A2A protocol.
-            </p>
-          </motion.div>
+        {/* Tagline */}
+        <p className="text-lg text-slate-600 mb-12 leading-relaxed">
+          Multi-agent orchestration platform powered by A2A protocol.
+          <br />
+          Natural language → intelligent coordination.
+        </p>
 
-          {/* CTA Buttons */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-20"
+        {/* CTA Buttons */}
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-16">
+          <button
+            onClick={() => router.push("/chat")}
+            className="px-6 py-2.5 bg-accent text-white rounded-lg hover:bg-accent/90 minimal-transition flex items-center gap-2 group"
           >
-            <button
-              onClick={() => router.push("/chat")}
-              className="button-primary flex items-center gap-2 group"
-            >
-              Start Chatting
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </button>
-            <button
-              onClick={() => router.push("/marketplace")}
-              className="button-secondary"
-            >
-              Browse Agents
-            </button>
-          </motion.div>
+            Start chatting
+            <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 minimal-transition" />
+          </button>
+          <button
+            onClick={() => router.push("/auth/login")}
+            className="px-6 py-2.5 border border-slate-200 text-slate-700 rounded-lg hover:border-slate-300 minimal-transition"
+          >
+            Sign in
+          </button>
+        </div>
 
-          {/* Features Grid */}
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.4 }}
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
-          >
-            {features.map((feature, index) => (
-              <motion.div
-                key={feature.title}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.5 + index * 0.1 }}
-                className="card group cursor-pointer hover:border-primary-200"
-              >
-                <div className="flex items-start gap-4">
-                  <div className="p-3 rounded-xl bg-gradient-to-br from-primary-500 to-primary-600 text-white group-hover:scale-110 transition-transform">
-                    <feature.icon className="w-6 h-6" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-slate-800 mb-2">
-                      {feature.title}
-                    </h3>
-                    <p className="text-sm text-slate-600">
-                      {feature.description}
-                    </p>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </motion.div>
+        {/* Features */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-sm">
+          <div>
+            <div className="font-medium text-slate-900 mb-1">Real-time streaming</div>
+            <div className="text-slate-500">Token-by-token responses with agent transparency</div>
+          </div>
+          <div>
+            <div className="font-medium text-slate-900 mb-1">Agent discovery</div>
+            <div className="text-slate-500">Automatic coordination of specialized agents</div>
+          </div>
+          <div>
+            <div className="font-medium text-slate-900 mb-1">A2A protocol</div>
+            <div className="text-slate-500">Fully compliant with Google's A2A v0.3.0</div>
+          </div>
+        </div>
 
-          {/* Stats */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.6, delay: 0.8 }}
-            className="mt-20 grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto"
-          >
-            {[
-              { number: "4+", label: "AI Agents" },
-              { number: "100%", label: "A2A Compliant" },
-              { number: "Real-time", label: "WebSocket Streaming" },
-            ].map((stat, index) => (
-              <div key={stat.label} className="text-center">
-                <div className="text-4xl font-bold gradient-text mb-2">
-                  {stat.number}
-                </div>
-                <div className="text-slate-600">{stat.label}</div>
-              </div>
-            ))}
-          </motion.div>
+        {/* Footer */}
+        <div className="mt-20 pt-8 border-t border-slate-200">
+          <p className="text-xs text-slate-500">
+            4 travel agents ready: FlightBooker · HotelBooker · RestaurantFinder · EventsFinder
+          </p>
         </div>
       </div>
     </div>

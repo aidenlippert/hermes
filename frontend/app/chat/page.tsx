@@ -1,22 +1,22 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Send, Loader2, Sparkles, User, Bot, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
+import { Send, Loader2, Circle, CheckCircle2, Clock, Users } from "lucide-react";
 import { useAuthStore, useChatStore } from "@/lib/store";
 import { api, createWebSocket } from "@/lib/api";
 import { useRouter } from "next/navigation";
 
 export default function ChatPage() {
   const router = useRouter();
-  const { token, user } = useAuthStore();
+  const { token, user, logout } = useAuthStore();
   const { messages, addMessage, addEvent, isStreaming, setStreaming, currentEvents } = useChatStore();
 
   const [input, setInput] = useState("");
-  const [ws, setWs] = useState<WebSocket | null>(null);
+  const [streamingText, setStreamingText] = useState("");
+  const [currentAgents, setCurrentAgents] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  // Redirect if not logged in
   useEffect(() => {
     if (!token) {
       router.push("/auth/login");
@@ -25,7 +25,41 @@ export default function ChatPage() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, currentEvents]);
+  }, [messages, streamingText]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  const simulateTokenStreaming = (text: string) => {
+    setStreamingText("");
+    const words = text.split(" ");
+    let currentIndex = 0;
+
+    const interval = setInterval(() => {
+      if (currentIndex < words.length) {
+        setStreamingText((prev) => prev + (prev ? " " : "") + words[currentIndex]);
+        currentIndex++;
+      } else {
+        clearInterval(interval);
+        addMessage({
+          id: Date.now().toString(),
+          role: "assistant",
+          content: text,
+          timestamp: new Date(),
+        });
+        setStreamingText("");
+        setStreaming(false);
+      }
+    }, 50);
+  };
 
   const handleSend = async () => {
     if (!input.trim() || !token || isStreaming) return;
@@ -40,48 +74,31 @@ export default function ChatPage() {
     addMessage(userMessage);
     setInput("");
     setStreaming(true);
+    setCurrentAgents([]);
 
     try {
-      // Send chat request
       const response = await api.chat.send({ query: input }, token);
 
-      // If we got a result immediately (direct LLM), show it now
       if (response.result) {
-        addMessage({
-          id: Date.now().toString(),
-          role: "assistant",
-          content: response.result,
-          timestamp: new Date(),
-          taskId: response.task_id,
-        });
-        setStreaming(false);
+        simulateTokenStreaming(response.result);
         return;
       }
 
-      // Connect to WebSocket for live updates (multi-agent orchestration)
       const websocket = createWebSocket(response.task_id, token);
-
-      websocket.onopen = () => {
-        console.log("WebSocket connected");
-      };
 
       websocket.onmessage = (event) => {
         const data = JSON.parse(event.data);
         addEvent(data);
 
-        // Add final result as assistant message
+        if (data.type === "agent_selected") {
+          setCurrentAgents((prev) => [...prev, data.agent_name]);
+        }
+
         if (data.type === "task_completed") {
           const result = data.final_output || response.result;
           if (result) {
-            addMessage({
-              id: Date.now().toString(),
-              role: "assistant",
-              content: result,
-              timestamp: new Date(),
-              taskId: response.task_id,
-            });
+            simulateTokenStreaming(result);
           }
-          setStreaming(false);
           websocket.close();
         } else if (data.type === "task_failed") {
           addMessage({
@@ -95,157 +112,182 @@ export default function ChatPage() {
         }
       };
 
-      websocket.onerror = (error) => {
-        console.error("WebSocket error:", error);
+      websocket.onerror = () => {
         setStreaming(false);
+        websocket.close();
       };
 
       setWs(websocket);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Chat error:", error);
-      addMessage({
-        id: Date.now().toString(),
-        role: "assistant",
-        content: `Error: ${error.response?.data?.detail || error.message}`,
-        timestamp: new Date(),
-      });
       setStreaming(false);
     }
   };
 
-  const getEventIcon = (type: string) => {
-    if (type.includes("completed")) return <CheckCircle2 className="w-4 h-4 text-success-500" />;
-    if (type.includes("failed") || type === "error") return <XCircle className="w-4 h-4 text-red-500" />;
-    if (type.includes("started")) return <Loader2 className="w-4 h-4 text-primary-500 animate-spin" />;
-    return <AlertCircle className="w-4 h-4 text-primary-500" />;
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
   };
 
-  if (!token) return null;
-
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="flex flex-col h-screen bg-white">
       {/* Header */}
-      <div className="glass-effect border-b border-white/20 px-6 py-4">
-        <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center">
-              <Sparkles className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="font-semibold text-lg text-slate-800">Hermes Chat</h1>
-              <p className="text-sm text-slate-600">Multi-agent orchestration</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="text-sm text-slate-600">
-              {user?.email}
-            </div>
-            <button
-              onClick={() => router.push("/marketplace")}
-              className="button-secondary text-sm py-2"
-            >
-              Browse Agents
-            </button>
-          </div>
+      <header className="border-b border-slate-200 px-6 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Circle className="w-5 h-5 text-accent" fill="currentColor" />
+          <span className="font-medium text-sm">Hermes</span>
         </div>
-      </div>
+        <div className="flex items-center gap-4">
+          {user && <span className="text-sm text-slate-600">{user.username}</span>}
+          <button
+            onClick={logout}
+            className="text-sm text-slate-500 hover:text-slate-900 fast-transition"
+          >
+            Sign out
+          </button>
+        </div>
+      </header>
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-6 py-8">
-        <div className="max-w-5xl mx-auto space-y-6">
-          <AnimatePresence>
-            {messages.map((message) => (
-              <motion.div
-                key={message.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className={`flex gap-4 ${
-                  message.role === "user" ? "justify-end" : "justify-start"
-                }`}
-              >
-                {message.role === "assistant" && (
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-500 to-accent-600 flex items-center justify-center flex-shrink-0">
-                    <Bot className="w-6 h-6 text-white" />
-                  </div>
-                )}
-                <div
-                  className={`max-w-2xl px-6 py-4 rounded-2xl ${
-                    message.role === "user"
-                      ? "bg-gradient-to-r from-primary-600 to-primary-700 text-white"
-                      : "glass-effect text-slate-800"
-                  }`}
-                >
-                  <div className="whitespace-pre-wrap">{message.content}</div>
-                </div>
-                {message.role === "user" && (
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-600 to-slate-700 flex items-center justify-center flex-shrink-0">
-                    <User className="w-6 h-6 text-white" />
-                  </div>
-                )}
-              </motion.div>
-            ))}
-          </AnimatePresence>
-
-          {/* Live Events */}
-          {isStreaming && currentEvents.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="card"
+        <div className="max-w-3xl mx-auto space-y-6">
+          {messages.map((message) => (
+            <div
+              key={message.id}
+              className={`animate-fade-in ${
+                message.role === "user" ? "ml-auto max-w-xl" : "mr-auto max-w-2xl"
+              }`}
             >
-              <div className="flex items-center gap-2 mb-4">
-                <Loader2 className="w-5 h-5 text-primary-500 animate-spin" />
-                <h3 className="font-semibold text-slate-800">Processing...</h3>
-              </div>
-              <div className="space-y-2">
-                {currentEvents.slice(-5).map((event, index) => (
-                  <motion.div
-                    key={index}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="flex items-center gap-3 text-sm"
+              <div className="flex items-start gap-3">
+                {message.role === "assistant" && (
+                  <div className="w-6 h-6 rounded-full bg-accent/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <Circle className="w-3 h-3 text-accent" fill="currentColor" />
+                  </div>
+                )}
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs text-slate-500 font-medium">
+                      {message.role === "user" ? "You" : "Hermes"}
+                    </span>
+                    <span className="text-xs text-slate-400">
+                      {formatTime(message.timestamp)}
+                    </span>
+                  </div>
+                  <div
+                    className={`text-sm leading-relaxed ${
+                      message.role === "user"
+                        ? "text-slate-900"
+                        : "text-slate-700"
+                    }`}
                   >
-                    {getEventIcon(event.type)}
-                    <span className="text-slate-600">{event.message}</span>
-                  </motion.div>
-                ))}
+                    {message.content}
+                  </div>
+                </div>
               </div>
-            </motion.div>
+            </div>
+          ))}
+
+          {/* Streaming Response */}
+          {streamingText && (
+            <div className="mr-auto max-w-2xl animate-fade-in">
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-full bg-accent/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <Circle className="w-3 h-3 text-accent" fill="currentColor" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs text-slate-500 font-medium">Hermes</span>
+                    <span className="text-xs text-slate-400">now</span>
+                  </div>
+                  <div className="text-sm leading-relaxed text-slate-700 token-fade-in">
+                    {streamingText}
+                    <span className="inline-block w-1 h-4 bg-accent ml-0.5 animate-pulse" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Thinking State */}
+          {isStreaming && !streamingText && (
+            <div className="mr-auto max-w-2xl animate-fade-in">
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-full bg-accent/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <Circle className="w-3 h-3 text-accent" fill="currentColor" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs text-slate-500 font-medium">Hermes</span>
+                    <span className="text-xs text-slate-400">now</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-slate-400 thinking-dot"></div>
+                    <div className="w-1.5 h-1.5 rounded-full bg-slate-400 thinking-dot"></div>
+                    <div className="w-1.5 h-1.5 rounded-full bg-slate-400 thinking-dot"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Agent Discovery UI */}
+          {currentAgents.length > 0 && (
+            <div className="mr-auto max-w-2xl">
+              <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg animate-scale-in">
+                <Users className="w-4 h-4 text-slate-500" />
+                <span className="text-xs text-slate-600">Coordinating with:</span>
+                <div className="flex gap-1.5">
+                  {currentAgents.map((agent, i) => (
+                    <span key={i} className="agent-badge">
+                      {agent}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
           )}
 
           <div ref={messagesEndRef} />
         </div>
       </div>
 
-      {/* Input */}
-      <div className="glass-effect border-t border-white/20 px-6 py-4">
-        <div className="max-w-5xl mx-auto">
-          <div className="flex gap-3">
+      {/* Input Area */}
+      <div className="border-t border-slate-200 px-6 py-4 bg-slate-50/50">
+        <div className="max-w-3xl mx-auto">
+          <div className="flex items-center gap-3">
             <input
+              ref={inputRef}
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
               placeholder="Ask Hermes anything..."
               disabled={isStreaming}
-              className="input-field flex-1"
+              className="flex-1 px-4 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent minimal-transition disabled:opacity-50 disabled:cursor-not-allowed"
             />
             <button
               onClick={handleSend}
-              disabled={!input.trim() || isStreaming}
-              className="button-primary disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isStreaming || !input.trim()}
+              className="p-2.5 bg-accent text-white rounded-lg hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed minimal-transition"
             >
               {isStreaming ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
+                <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                <Send className="w-5 h-5" />
+                <Send className="w-4 h-4" />
               )}
             </button>
           </div>
-          <p className="text-xs text-slate-500 mt-2 text-center">
-            Powered by multi-agent orchestration with real-time streaming
-          </p>
+          <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
+            <span>
+              Press <kbd className="kbd">⌘K</kbd> to focus
+            </span>
+            <span>
+              <kbd className="kbd">Enter</kbd> to send
+            </span>
+          </div>
         </div>
       </div>
     </div>
