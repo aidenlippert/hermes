@@ -120,6 +120,9 @@ export const api = {
 
 // WebSocket Connection
 export function createWebSocket(taskId: string, token: string) {
-  const wsUrl = `ws://localhost:8000/api/v1/ws/tasks/${taskId}?token=${token}`;
+  // Convert HTTP URL to WebSocket URL
+  const wsProtocol = API_URL.startsWith("https") ? "wss" : "ws";
+  const wsHost = API_URL.replace("https://", "").replace("http://", "");
+  const wsUrl = `${wsProtocol}://${wsHost}/api/v1/ws/tasks/${taskId}?token=${token}`;
   return new WebSocket(wsUrl);
 }
