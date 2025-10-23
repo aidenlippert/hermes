@@ -20,16 +20,18 @@ from sqlalchemy.sql import func
 from datetime import datetime
 from enum import Enum
 import uuid
+import os
 
 from .connection import Base
 
-# Try to import pgvector, fallback to JSON if not available
-try:
-    from pgvector.sqlalchemy import Vector
-    HAS_PGVECTOR = True
-except ImportError:
-    HAS_PGVECTOR = False
-    Vector = None
+# Check if pgvector is enabled via environment variable (default: disabled for Railway)
+USE_PGVECTOR = os.getenv("USE_PGVECTOR", "false").lower() == "true"
+
+if USE_PGVECTOR:
+    try:
+        from pgvector.sqlalchemy import Vector
+    except ImportError:
+        USE_PGVECTOR = False
 
 
 # Enums
@@ -143,8 +145,8 @@ class Agent(Base):
     tags = Column(JSON, default=list)  # Searchable tags
 
     # Embeddings for semantic search (1536 dimensions for OpenAI/Gemini)
-    # Falls back to JSON array if pgvector not available
-    description_embedding = Column(Vector(1536) if HAS_PGVECTOR and Vector else JSON, nullable=True)
+    # Falls back to JSON array if pgvector not enabled
+    description_embedding = Column(Vector(1536) if USE_PGVECTOR else JSON, nullable=True)
 
     # Performance metrics
     total_calls = Column(Integer, default=0)
