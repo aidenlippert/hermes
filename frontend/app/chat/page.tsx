@@ -91,7 +91,8 @@ export default function ChatPage() {
         body: JSON.stringify({
           task_id: currentTaskId,
           conversation_id: conversationId,
-          approved: true
+          approved: true,
+          extracted_info: approvalData?.extracted_info
         })
       });
 

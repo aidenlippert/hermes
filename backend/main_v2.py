@@ -211,6 +211,7 @@ class ApprovalRequest(BaseModel):
     task_id: str
     conversation_id: str
     approved: bool = True
+    extracted_info: Optional[Dict[str, Any]] = None
 
 
 class AgentSearchRequest(BaseModel):
@@ -556,14 +557,16 @@ async def approve_agents(
         {"name": "EventsFinder"}
     ]
 
-    # Extracted info from conductor (hardcode for now, should come from task metadata)
-    extracted_info = {
+    # Get extracted info from request (sent from frontend) or use fallback
+    extracted_info = request.extracted_info or {
         "destination": "Cancun",
         "departure_location": "San Diego",
         "travel_dates": "October 25th to October 30th",
         "num_travelers": 3,
         "budget": "2000 USD"
     }
+
+    logger.info(f"📍 Using extracted info: {extracted_info}")
 
     # Send execution started event
     await manager.send_to_task(request.task_id, {
