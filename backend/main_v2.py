@@ -553,25 +553,14 @@ async def root():
     }
 
 
+@app.get("/health")
 @app.get("/api/v1/health")
-async def health(db: AsyncSession = Depends(get_db)):
-    """Health check with database status"""
-    try:
-        # Check database
-        from sqlalchemy import text
-        await db.execute(text("SELECT 1"))
-
-        return {
-            "status": "healthy",
-            "database": "connected",
-            "version": "2.0.0"
-        }
-    except Exception as e:
-        return {
-            "status": "degraded",
-            "database": "disconnected",
-            "error": str(e)
-        }
+async def health():
+    """Health check - simple version for Railway"""
+    return {
+        "status": "healthy",
+        "version": "2.0.0"
+    }
 
 
 # ============================================================================

@@ -19,6 +19,10 @@ DATABASE_URL = os.getenv(
     "postgresql+asyncpg://hermes:hermes_dev_password@localhost:5432/hermes"
 )
 
+# Railway provides postgresql:// but we need postgresql+asyncpg://
+if DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
+
 REDIS_URL = os.getenv(
     "REDIS_URL",
     "redis://:hermes_dev_password@localhost:6379/0"
