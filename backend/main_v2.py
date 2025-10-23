@@ -368,7 +368,7 @@ async def chat(
             llm = get_llm_provider()
 
             # Get conversation history for context
-            conversation_messages = await ConversationService.get_messages(db, conversation_id)
+            conversation_messages = await ConversationService.get_conversation_messages(db, conversation_id)
             messages = [
                 {"role": msg.role, "content": msg.content}
                 for msg in conversation_messages[-10:]  # Last 10 messages for context
