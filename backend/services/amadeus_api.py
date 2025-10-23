@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 AMADEUS_API_KEY = os.getenv("AMADEUS_API_KEY")
 AMADEUS_API_SECRET = os.getenv("AMADEUS_API_SECRET")
-AMADEUS_BASE_URL = "https://test.api.amadeus.com/v1"  # Test environment
+AMADEUS_BASE_URL = "https://api.amadeus.com/v1"  # Production environment
 
 
 class AmadeusService:
@@ -38,7 +38,7 @@ class AmadeusService:
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    f"{AMADEUS_BASE_URL}/security/oauth2/token",
+                    "https://api.amadeus.com/v1/security/oauth2/token",
                     data={
                         "grant_type": "client_credentials",
                         "client_id": AMADEUS_API_KEY,
