@@ -28,6 +28,8 @@ export interface ChatResponse {
   message: string;
   result?: any;
   steps?: any[];
+  agents?: any[];
+  extracted_info?: any;
 }
 
 export interface Agent {

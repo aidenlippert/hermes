@@ -198,6 +198,8 @@ class ChatResponse(BaseModel):
     message: str
     result: Optional[Any] = None
     steps: Optional[List[Dict[str, Any]]] = None
+    agents: Optional[List[Dict[str, Any]]] = None
+    extracted_info: Optional[Dict[str, Any]] = None
 
 
 class AgentSearchRequest(BaseModel):
@@ -440,7 +442,9 @@ async def chat(
                 status="awaiting_approval",
                 message="Agents discovered, awaiting approval",
                 result=response_message,
-                steps=[]
+                steps=[],
+                agents=execution_plan["agents"],
+                extracted_info=execution_plan.get("extracted_info", {})
             )
 
         # STEP 5: User approved - create workflow plan

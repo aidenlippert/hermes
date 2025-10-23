@@ -115,34 +115,18 @@ export default function ChatPage() {
       }
 
       // Check if this is an awaiting_approval response
-      if (response.status === "awaiting_approval") {
-        // We need to connect to WebSocket to get the agent data
-        const websocket = createWebSocket(response.task_id, token);
-
-        websocket.onmessage = (event) => {
-          const data = JSON.parse(event.data);
-          addEvent(data);
-
-          if (data.type === "awaiting_approval") {
-            setDiscoveryPhase(null);
-            setAwaitingApproval(true);
-            setApprovalData({
-              agents: data.agents,
-              extracted_info: data.extracted_info
-            });
-            setCurrentAgents(data.agents || []);
-            if (data.message) {
-              simulateTokenStreaming(data.message);
-            }
-            websocket.close();
-          }
-        };
-
-        websocket.onerror = () => {
-          setStreaming(false);
-          websocket.close();
-        };
-
+      if (response.status === "awaiting_approval" && response.agents) {
+        // Use agent data from HTTP response directly (no WebSocket race condition)
+        setDiscoveryPhase(null);
+        setAwaitingApproval(true);
+        setApprovalData({
+          agents: response.agents,
+          extracted_info: response.extracted_info || {}
+        });
+        setCurrentAgents(response.agents);
+        if (response.result) {
+          simulateTokenStreaming(response.result);
+        }
         return;
       }
 
