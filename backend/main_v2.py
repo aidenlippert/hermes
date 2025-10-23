@@ -361,9 +361,39 @@ async def chat(
             agents = await AgentRegistry.semantic_search(db, request.query, limit=5)
 
         if not agents:
-            raise HTTPException(
-                status_code=503,
-                detail="No suitable agents found. Please register agents first."
+            # No agents - respond directly with LLM
+            logger.info("⚠️ No agents found, responding directly with LLM")
+
+            from backend.services.llm_provider import get_llm_provider
+            llm = get_llm_provider()
+
+            # Get conversation history for context
+            conversation_messages = await ConversationService.get_messages(db, conversation_id)
+            messages = [
+                {"role": msg.role, "content": msg.content}
+                for msg in conversation_messages[-10:]  # Last 10 messages for context
+            ]
+
+            # Generate response
+            response_text = await llm.chat_completion(messages)
+
+            # Update task
+            await TaskService.complete_task(db, task.id, final_output=response_text)
+
+            # Add assistant message
+            await ConversationService.add_message(
+                db, conversation_id, "assistant", response_text, task.id
+            )
+
+            logger.info("✅ Direct LLM response sent")
+
+            return ChatResponse(
+                task_id=task.id,
+                conversation_id=conversation_id,
+                status="completed",
+                message="Responded with direct LLM",
+                result=response_text,
+                steps=[]
             )
 
         # Convert to format planner expects
