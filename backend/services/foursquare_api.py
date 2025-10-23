@@ -45,7 +45,7 @@ class FoursquareService:
 
         try:
             headers = {
-                "Authorization": FOURSQUARE_API_KEY,
+                "Authorization": f"Bearer {FOURSQUARE_API_KEY}" if not FOURSQUARE_API_KEY.startswith("Bearer") else FOURSQUARE_API_KEY,
                 "Accept": "application/json"
             }
 
@@ -114,7 +114,7 @@ class FoursquareService:
 
         try:
             headers = {
-                "Authorization": FOURSQUARE_API_KEY,
+                "Authorization": f"Bearer {FOURSQUARE_API_KEY}" if not FOURSQUARE_API_KEY.startswith("Bearer") else FOURSQUARE_API_KEY,
                 "Accept": "application/json"
             }
 
