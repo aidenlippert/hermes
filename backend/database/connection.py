@@ -78,16 +78,17 @@ async def init_db():
     """
     logger.info("🔧 Initializing database...")
 
-    async with engine.begin() as conn:
-        # Try to install pgvector extension (optional, for semantic search)
-        try:
+    # Try to install pgvector extension (optional, for semantic search)
+    try:
+        async with engine.begin() as conn:
             from sqlalchemy import text
             await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
             logger.info("✅ pgvector extension installed")
-        except Exception as e:
-            logger.warning(f"⚠️ pgvector not available (semantic search disabled): {e}")
+    except Exception as e:
+        logger.warning(f"⚠️ pgvector not available (semantic search disabled)")
 
-        # Create all tables
+    # Create all tables (separate transaction)
+    async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         logger.info("✅ Database tables created")
 
