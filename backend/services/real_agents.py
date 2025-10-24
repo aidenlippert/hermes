@@ -16,6 +16,9 @@ from backend.services.llm_provider import get_llm_provider
 
 logger = logging.getLogger(__name__)
 
+# Cache for location resolutions to avoid hitting Gemini rate limits
+_location_cache = {}
+
 
 async def resolve_location_info(location_name: str, is_destination: bool = True) -> Optional[Dict[str, Any]]:
     """
@@ -28,6 +31,12 @@ async def resolve_location_info(location_name: str, is_destination: bool = True)
     Returns:
         Dictionary with airport code, latitude, and longitude, or None if failed
     """
+    # Check cache first
+    cache_key = location_name.lower()
+    if cache_key in _location_cache:
+        logger.info(f"📍 Using cached location for {location_name}")
+        return _location_cache[cache_key]
+
     try:
         llm = get_llm_provider()
 
@@ -71,6 +80,9 @@ Now for: {location_name}"""
             response_text = json_match.group(0)
 
         location_info = json.loads(response_text.strip())
+
+        # Cache the result
+        _location_cache[cache_key] = location_info
 
         logger.info(f"📍 Resolved {location_name} → {location_info['airport']} ({location_info['latitude']}, {location_info['longitude']})")
         return location_info
