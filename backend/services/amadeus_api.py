@@ -39,6 +39,9 @@ class AmadeusService:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
                     "https://api.amadeus.com/v1/security/oauth2/token",
+                    headers={
+                        "Content-Type": "application/x-www-form-urlencoded"
+                    },
                     data={
                         "grant_type": "client_credentials",
                         "client_id": AMADEUS_API_KEY,
@@ -52,7 +55,8 @@ class AmadeusService:
             cls._access_token = data["access_token"]
             cls._token_expiry = datetime.now() + timedelta(seconds=data.get("expires_in", 1800))
 
-            logger.info("✅ Amadeus access token obtained")
+            logger.info(f"✅ Amadeus access token obtained (expires in {data.get('expires_in', 1800)}s)")
+            logger.info(f"   Token preview: {cls._access_token[:20]}...")
             return cls._access_token
 
         except Exception as e:
