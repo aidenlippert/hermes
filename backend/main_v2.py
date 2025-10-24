@@ -548,14 +548,19 @@ async def approve_agents(
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
-    # Parse agents from approval data (passed from frontend)
-    # In production, we'd get this from the task metadata
-    agents = [
-        {"name": "FlightBooker"},
-        {"name": "HotelBooker"},
-        {"name": "RestaurantFinder"},
-        {"name": "EventsFinder"}
-    ]
+    # Get agents from task metadata (what was actually shown to user)
+    # Parse from task context or use only approved ones
+    task_context = task.context or {}
+    agents = task_context.get("agents", [])
+
+    # If no agents in context, only use Flight and Hotel (the core ones)
+    if not agents:
+        agents = [
+            {"name": "FlightBooker"},
+            {"name": "HotelBooker"}
+        ]
+
+    logger.info(f"🎯 Executing {len(agents)} approved agents: {[a['name'] for a in agents]}")
 
     # Get extracted info from request (sent from frontend) or use fallback
     extracted_info = request.extracted_info or {
@@ -576,27 +581,31 @@ async def approve_agents(
         "total_agents": len(agents)
     })
 
-    # Execute real agents with external APIs
+    # Execute real agents with external APIs (with timeout protection)
     import asyncio
     real_results = {}
 
-    for i, agent in enumerate(agents, 1):
-        agent_name = agent["name"]
+    async def execute_agent_with_timeout(agent_name: str, agent_index: int) -> tuple:
+        """Execute a single agent with timeout protection"""
+        try:
+            await manager.send_to_task(request.task_id, {
+                "type": "agent_progress",
+                "task_id": request.task_id,
+                "agent_name": agent_name,
+                "status": "working",
+                "message": f"🔄 {agent_name} is searching live data...",
+                "progress": agent_index / len(agents)
+            })
 
-        await manager.send_to_task(request.task_id, {
-            "type": "agent_progress",
-            "task_id": request.task_id,
-            "agent_name": agent_name,
-            "status": "working",
-            "message": f"🔄 {agent_name} is searching live data...",
-            "progress": i / len(agents)
-        })
-
-        # Execute the agent with real API
-        from backend.services.real_agents import AGENT_EXECUTORS
-        if agent_name in AGENT_EXECUTORS:
-            result = await AGENT_EXECUTORS[agent_name](extracted_info)
-            real_results[agent_name] = result
+            # Execute with 30 second timeout
+            from backend.services.real_agents import AGENT_EXECUTORS
+            if agent_name in AGENT_EXECUTORS:
+                result = await asyncio.wait_for(
+                    AGENT_EXECUTORS[agent_name](extracted_info),
+                    timeout=30.0
+                )
+            else:
+                result = {"status": "error", "message": "Agent not found"}
 
             await manager.send_to_task(request.task_id, {
                 "type": "agent_completed",
@@ -606,10 +615,33 @@ async def approve_agents(
                 "message": f"✅ {agent_name} found {result.get('data', {}).get('summary', 'results')}" if result["status"] == "success" else f"❌ {agent_name} failed: {result.get('message')}",
                 "data": result.get("data", {})
             })
-        else:
-            real_results[agent_name] = {"status": "error", "message": "Agent not found"}
 
-        await asyncio.sleep(0.5)
+            return agent_name, result
+
+        except asyncio.TimeoutError:
+            logger.error(f"⏱️ {agent_name} timed out after 30s")
+            result = {"status": "error", "message": "Agent timed out after 30 seconds"}
+            return agent_name, result
+        except Exception as e:
+            logger.error(f"❌ {agent_name} execution error: {e}")
+            result = {"status": "error", "message": str(e)}
+            return agent_name, result
+
+    # Execute all agents in parallel with timeout
+    tasks = [
+        execute_agent_with_timeout(agent["name"], i)
+        for i, agent in enumerate(agents, 1)
+    ]
+
+    results_list = await asyncio.gather(*tasks, return_exceptions=True)
+
+    # Collect results
+    for item in results_list:
+        if isinstance(item, tuple):
+            agent_name, result = item
+            real_results[agent_name] = result
+        else:
+            logger.error(f"Unexpected result type: {type(item)}")
 
     # Generate summary from real results
     summary_parts = ["🎉 **Your Trip Results**\n"]
