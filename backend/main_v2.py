@@ -536,203 +536,209 @@ async def approve_agents(
     - Amadeus API for flights, hotels, activities
     - Foursquare API for restaurants
     """
-    logger.info(f"✅ User approved agents for task {request.task_id}")
+    try:
+        logger.info(f"✅ User approved agents for task {request.task_id}")
 
-    # Get task to retrieve agent data
-    task = await TaskService.get_task(db, request.task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+        # Get task to retrieve agent data
+        task = await TaskService.get_task(db, request.task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
 
-    # Get conversation to retrieve extracted_info
-    conversation = await ConversationService.get_conversation(db, request.conversation_id)
-    if not conversation:
-        raise HTTPException(status_code=404, detail="Conversation not found")
+        # Get conversation to retrieve extracted_info
+        conversation = await ConversationService.get_conversation(db, request.conversation_id)
+        if not conversation:
+            raise HTTPException(status_code=404, detail="Conversation not found")
 
-    # Get agents from task metadata (what was actually shown to user)
-    # Parse from task context or use only approved ones
-    task_context = task.context or {}
-    agents = task_context.get("agents", [])
+        # Get agents from task metadata (what was actually shown to user)
+        # Parse from task context or use only approved ones
+        task_context = task.context or {}
+        agents = task_context.get("agents", [])
 
-    # If no agents in context, only use Flight and Hotel (the core ones)
-    if not agents:
-        agents = [
-            {"name": "FlightBooker"},
-            {"name": "HotelBooker"}
+        # If no agents in context, only use Flight and Hotel (the core ones)
+        if not agents:
+            agents = [
+                {"name": "FlightBooker"},
+                {"name": "HotelBooker"}
+            ]
+
+        logger.info(f"🎯 Executing {len(agents)} approved agents: {[a['name'] for a in agents]}")
+
+        # Get extracted info from request (sent from frontend) or use fallback
+        extracted_info = request.extracted_info or {
+            "destination": "Cancun",
+            "departure_location": "San Diego",
+            "travel_dates": "October 25th to October 30th",
+            "num_travelers": 3,
+            "budget": "2000 USD"
+        }
+
+        logger.info(f"📍 Using extracted info: {extracted_info}")
+
+        # Send execution started event
+        await manager.send_to_task(request.task_id, {
+            "type": "execution_started",
+            "task_id": request.task_id,
+            "message": "🚀 Starting real agent execution with live APIs...",
+            "total_agents": len(agents)
+        })
+
+        # Execute real agents with external APIs (with timeout protection)
+        import asyncio
+        real_results = {}
+
+        async def execute_agent_with_timeout(agent_name: str, agent_index: int) -> tuple:
+            """Execute a single agent with timeout protection"""
+            try:
+                await manager.send_to_task(request.task_id, {
+                    "type": "agent_progress",
+                    "task_id": request.task_id,
+                    "agent_name": agent_name,
+                    "status": "working",
+                    "message": f"🔄 {agent_name} is searching live data...",
+                    "progress": agent_index / len(agents)
+                })
+
+                # Execute with 30 second timeout
+                from backend.services.real_agents import AGENT_EXECUTORS
+                if agent_name in AGENT_EXECUTORS:
+                    result = await asyncio.wait_for(
+                        AGENT_EXECUTORS[agent_name](extracted_info),
+                        timeout=30.0
+                    )
+                else:
+                    result = {"status": "error", "message": "Agent not found"}
+
+                await manager.send_to_task(request.task_id, {
+                    "type": "agent_completed",
+                    "task_id": request.task_id,
+                    "agent_name": agent_name,
+                    "status": "completed" if result["status"] == "success" else "failed",
+                    "message": f"✅ {agent_name} found {result.get('data', {}).get('summary', 'results')}" if result["status"] == "success" else f"❌ {agent_name} failed: {result.get('message')}",
+                    "data": result.get("data", {})
+                })
+
+                return agent_name, result
+
+            except asyncio.TimeoutError:
+                logger.error(f"⏱️ {agent_name} timed out after 30s")
+                result = {"status": "error", "message": "Agent timed out after 30 seconds"}
+                return agent_name, result
+            except Exception as e:
+                logger.error(f"❌ {agent_name} execution error: {e}")
+                result = {"status": "error", "message": str(e)}
+                return agent_name, result
+
+        # Execute all agents in parallel with timeout
+        tasks = [
+            execute_agent_with_timeout(agent["name"], i)
+            for i, agent in enumerate(agents, 1)
         ]
 
-    logger.info(f"🎯 Executing {len(agents)} approved agents: {[a['name'] for a in agents]}")
+        results_list = await asyncio.gather(*tasks, return_exceptions=True)
 
-    # Get extracted info from request (sent from frontend) or use fallback
-    extracted_info = request.extracted_info or {
-        "destination": "Cancun",
-        "departure_location": "San Diego",
-        "travel_dates": "October 25th to October 30th",
-        "num_travelers": 3,
-        "budget": "2000 USD"
-    }
-
-    logger.info(f"📍 Using extracted info: {extracted_info}")
-
-    # Send execution started event
-    await manager.send_to_task(request.task_id, {
-        "type": "execution_started",
-        "task_id": request.task_id,
-        "message": "🚀 Starting real agent execution with live APIs...",
-        "total_agents": len(agents)
-    })
-
-    # Execute real agents with external APIs (with timeout protection)
-    import asyncio
-    real_results = {}
-
-    async def execute_agent_with_timeout(agent_name: str, agent_index: int) -> tuple:
-        """Execute a single agent with timeout protection"""
-        try:
-            await manager.send_to_task(request.task_id, {
-                "type": "agent_progress",
-                "task_id": request.task_id,
-                "agent_name": agent_name,
-                "status": "working",
-                "message": f"🔄 {agent_name} is searching live data...",
-                "progress": agent_index / len(agents)
-            })
-
-            # Execute with 30 second timeout
-            from backend.services.real_agents import AGENT_EXECUTORS
-            if agent_name in AGENT_EXECUTORS:
-                result = await asyncio.wait_for(
-                    AGENT_EXECUTORS[agent_name](extracted_info),
-                    timeout=30.0
-                )
+        # Collect results
+        for item in results_list:
+            if isinstance(item, tuple):
+                agent_name, result = item
+                real_results[agent_name] = result
             else:
-                result = {"status": "error", "message": "Agent not found"}
+                logger.error(f"Unexpected result type: {type(item)}")
 
-            await manager.send_to_task(request.task_id, {
-                "type": "agent_completed",
-                "task_id": request.task_id,
-                "agent_name": agent_name,
-                "status": "completed" if result["status"] == "success" else "failed",
-                "message": f"✅ {agent_name} found {result.get('data', {}).get('summary', 'results')}" if result["status"] == "success" else f"❌ {agent_name} failed: {result.get('message')}",
-                "data": result.get("data", {})
-            })
+        # Generate summary from real results
+        summary_parts = ["🎉 **Your Trip Results**\n"]
+        has_any_results = False
 
-            return agent_name, result
+        # FlightBooker results
+        if "FlightBooker" in real_results:
+            if real_results["FlightBooker"]["status"] == "success":
+                flights = real_results["FlightBooker"]["data"].get("flights", [])
+                if flights:
+                    has_any_results = True
+                    flight = flights[0]
+                    summary_parts.append(f"\n**✈️ Flights** (from Amadeus API)")
+                    summary_parts.append(f"- {flight['outbound']['departure']['airport']} → {flight['outbound']['arrival']['airport']}")
+                    summary_parts.append(f"- Price: {flight['price']} per person")
+                    if "return" in flight:
+                        summary_parts.append(f"- Round trip included")
+            else:
+                summary_parts.append(f"\n**✈️ Flights**: ⚠️ {real_results['FlightBooker'].get('message', 'API temporarily unavailable')}")
 
-        except asyncio.TimeoutError:
-            logger.error(f"⏱️ {agent_name} timed out after 30s")
-            result = {"status": "error", "message": "Agent timed out after 30 seconds"}
-            return agent_name, result
-        except Exception as e:
-            logger.error(f"❌ {agent_name} execution error: {e}")
-            result = {"status": "error", "message": str(e)}
-            return agent_name, result
+        # HotelBooker results
+        if "HotelBooker" in real_results:
+            if real_results["HotelBooker"]["status"] == "success":
+                hotels = real_results["HotelBooker"]["data"].get("hotels", [])
+                if hotels:
+                    has_any_results = True
+                    hotel = hotels[0]
+                    summary_parts.append(f"\n**🏨 Hotels** (from Amadeus API)")
+                    summary_parts.append(f"- {hotel['name']}")
+                    summary_parts.append(f"- {hotel['price_per_night']} per night")
+                    if hotel.get('rating'):
+                        summary_parts.append(f"- Rating: {hotel['rating']}/5")
+            else:
+                summary_parts.append(f"\n**🏨 Hotels**: ⚠️ {real_results['HotelBooker'].get('message', 'API temporarily unavailable')}")
 
-    # Execute all agents in parallel with timeout
-    tasks = [
-        execute_agent_with_timeout(agent["name"], i)
-        for i, agent in enumerate(agents, 1)
-    ]
+        # RestaurantFinder results
+        if "RestaurantFinder" in real_results:
+            if real_results["RestaurantFinder"]["status"] == "success":
+                restaurants = real_results["RestaurantFinder"]["data"].get("restaurants", [])
+                if restaurants:
+                    has_any_results = True
+                    summary_parts.append(f"\n**🍽️ Restaurants** (from Foursquare API)")
+                    for r in restaurants[:3]:
+                        summary_parts.append(f"- {r['name']} ({r['cuisine']}) - {r['rating']}/5 ⭐")
+            else:
+                summary_parts.append(f"\n**🍽️ Restaurants**: ⚠️ {real_results['RestaurantFinder'].get('message', 'API temporarily unavailable')}")
 
-    results_list = await asyncio.gather(*tasks, return_exceptions=True)
+        # EventsFinder results
+        if "EventsFinder" in real_results:
+            if real_results["EventsFinder"]["status"] == "success":
+                activities = real_results["EventsFinder"]["data"].get("activities", [])
+                if activities:
+                    has_any_results = True
+                    summary_parts.append(f"\n**🎭 Activities** (from Amadeus API)")
+                    for a in activities[:3]:
+                        summary_parts.append(f"- {a['name']} - {a['price']}")
+            else:
+                summary_parts.append(f"\n**🎭 Activities**: ⚠️ {real_results['EventsFinder'].get('message', 'API temporarily unavailable')}")
 
-    # Collect results
-    for item in results_list:
-        if isinstance(item, tuple):
-            agent_name, result = item
-            real_results[agent_name] = result
+        summary = "\n".join(summary_parts)
+
+        if has_any_results:
+            summary += "\n\n✨ **Data is LIVE from real travel APIs!**"
         else:
-            logger.error(f"Unexpected result type: {type(item)}")
+            summary += "\n\n⚠️ **APIs are still activating - production credentials can take up to 24 hours.**"
+            summary += "\n💡 Try again soon or check your Amadeus dashboard for activation status."
 
-    # Generate summary from real results
-    summary_parts = ["🎉 **Your Trip Results**\n"]
-    has_any_results = False
+        # Update task
+        await TaskService.complete_task(db, request.task_id, final_output=summary)
 
-    # FlightBooker results
-    if "FlightBooker" in real_results:
-        if real_results["FlightBooker"]["status"] == "success":
-            flights = real_results["FlightBooker"]["data"].get("flights", [])
-            if flights:
-                has_any_results = True
-                flight = flights[0]
-                summary_parts.append(f"\n**✈️ Flights** (from Amadeus API)")
-                summary_parts.append(f"- {flight['outbound']['departure']['airport']} → {flight['outbound']['arrival']['airport']}")
-                summary_parts.append(f"- Price: {flight['price']} per person")
-                if "return" in flight:
-                    summary_parts.append(f"- Round trip included")
-        else:
-            summary_parts.append(f"\n**✈️ Flights**: ⚠️ {real_results['FlightBooker'].get('message', 'API temporarily unavailable')}")
+        # Add to conversation
+        await ConversationService.add_message(
+            db, request.conversation_id, "assistant", summary, request.task_id
+        )
 
-    # HotelBooker results
-    if "HotelBooker" in real_results:
-        if real_results["HotelBooker"]["status"] == "success":
-            hotels = real_results["HotelBooker"]["data"].get("hotels", [])
-            if hotels:
-                has_any_results = True
-                hotel = hotels[0]
-                summary_parts.append(f"\n**🏨 Hotels** (from Amadeus API)")
-                summary_parts.append(f"- {hotel['name']}")
-                summary_parts.append(f"- {hotel['price_per_night']} per night")
-                if hotel.get('rating'):
-                    summary_parts.append(f"- Rating: {hotel['rating']}/5")
-        else:
-            summary_parts.append(f"\n**🏨 Hotels**: ⚠️ {real_results['HotelBooker'].get('message', 'API temporarily unavailable')}")
+        # Send completion event
+        await manager.send_to_task(request.task_id, {
+            "type": "execution_completed",
+            "task_id": request.task_id,
+            "message": summary,
+            "results": real_results
+        })
 
-    # RestaurantFinder results
-    if "RestaurantFinder" in real_results:
-        if real_results["RestaurantFinder"]["status"] == "success":
-            restaurants = real_results["RestaurantFinder"]["data"].get("restaurants", [])
-            if restaurants:
-                has_any_results = True
-                summary_parts.append(f"\n**🍽️ Restaurants** (from Foursquare API)")
-                for r in restaurants[:3]:
-                    summary_parts.append(f"- {r['name']} ({r['cuisine']}) - {r['rating']}/5 ⭐")
-        else:
-            summary_parts.append(f"\n**🍽️ Restaurants**: ⚠️ {real_results['RestaurantFinder'].get('message', 'API temporarily unavailable')}")
+        return ChatResponse(
+            task_id=request.task_id,
+            conversation_id=request.conversation_id,
+            status="completed",
+            message="Trip planning completed",
+            result=summary,
+            steps=[]
+        )
 
-    # EventsFinder results
-    if "EventsFinder" in real_results:
-        if real_results["EventsFinder"]["status"] == "success":
-            activities = real_results["EventsFinder"]["data"].get("activities", [])
-            if activities:
-                has_any_results = True
-                summary_parts.append(f"\n**🎭 Activities** (from Amadeus API)")
-                for a in activities[:3]:
-                    summary_parts.append(f"- {a['name']} - {a['price']}")
-        else:
-            summary_parts.append(f"\n**🎭 Activities**: ⚠️ {real_results['EventsFinder'].get('message', 'API temporarily unavailable')}")
-
-    summary = "\n".join(summary_parts)
-
-    if has_any_results:
-        summary += "\n\n✨ **Data is LIVE from real travel APIs!**"
-    else:
-        summary += "\n\n⚠️ **APIs are still activating - production credentials can take up to 24 hours.**"
-        summary += "\n💡 Try again soon or check your Amadeus dashboard for activation status."
-
-    # Update task
-    await TaskService.complete_task(db, request.task_id, final_output=summary)
-
-    # Add to conversation
-    await ConversationService.add_message(
-        db, request.conversation_id, "assistant", summary, request.task_id
-    )
-
-    # Send completion event
-    await manager.send_to_task(request.task_id, {
-        "type": "execution_completed",
-        "task_id": request.task_id,
-        "message": summary,
-        "results": real_results
-    })
-
-    return ChatResponse(
-        task_id=request.task_id,
-        conversation_id=request.conversation_id,
-        status="completed",
-        message="Trip planning completed",
-        result=summary,
-        steps=[]
-    )
+    except Exception as e:
+        logger.error(f"❌ Approval execution failed: {e}")
+        logger.exception(e)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ============================================================================
