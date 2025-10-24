@@ -26,20 +26,7 @@ class LLMProvider:
         """Initialize LLM providers in priority order"""
         self.providers = []
 
-        # Priority 1: AI/ML API (best free tier, 200+ models)
-        aimlapi_key = os.getenv("AIMLAPI_KEY") or os.getenv("AIML_API_KEY")
-        if aimlapi_key:
-            try:
-                self.aimlapi_client = OpenAI(
-                    api_key=aimlapi_key,
-                    base_url="https://api.aimlapi.com/v1"
-                )
-                self.providers.append("aimlapi")
-                logger.info("✅ AI/ML API initialized")
-            except Exception as e:
-                logger.warning(f"⚠️ AI/ML API init failed: {e}")
-
-        # Priority 2: Gemini (free tier)
+        # Priority 1: Gemini (free tier)
         google_api_key = os.getenv("GOOGLE_API_KEY")
         if google_api_key:
             try:
@@ -51,20 +38,10 @@ class LLMProvider:
             except Exception as e:
                 logger.warning(f"⚠️ Gemini init failed: {e}")
 
-        # Priority 3: OpenAI (paid)
-        openai_key = os.getenv("OPENAI_API_KEY")
-        if openai_key:
-            try:
-                self.openai_client = OpenAI(api_key=openai_key)
-                self.providers.append("openai")
-                logger.info("✅ OpenAI initialized")
-            except Exception as e:
-                logger.warning(f"⚠️ OpenAI init failed: {e}")
-
         if not self.providers:
             logger.error("❌ No LLM providers available!")
-
-        logger.info(f"🤖 Active providers: {', '.join(self.providers)}")
+        else:
+            logger.info(f"🤖 Active provider: Gemini")
 
     async def chat_completion(
         self,
@@ -86,20 +63,12 @@ class LLMProvider:
             Generated text response
         """
 
-        # Try each provider in order
-        for provider in self.providers:
-            try:
-                if provider == "aimlapi":
-                    return await self._aimlapi_chat(messages, model, temperature, max_tokens)
-                elif provider == "gemini":
-                    return await self._gemini_chat(messages, model, temperature, max_tokens)
-                elif provider == "openai":
-                    return await self._openai_chat(messages, model, temperature, max_tokens)
-            except Exception as e:
-                logger.warning(f"⚠️ {provider} failed: {e}, trying next provider...")
-                continue
-
-        raise Exception("All LLM providers failed")
+        # Use Gemini
+        try:
+            return await self._gemini_chat(messages, model, temperature, max_tokens)
+        except Exception as e:
+            logger.error(f"❌ Gemini failed: {e}")
+            raise Exception("LLM provider failed")
 
     async def _aimlapi_chat(
         self,

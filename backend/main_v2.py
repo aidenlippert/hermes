@@ -612,48 +612,70 @@ async def approve_agents(
         await asyncio.sleep(0.5)
 
     # Generate summary from real results
-    summary_parts = ["🎉 **Your Trip Results from Live APIs**\n"]
+    summary_parts = ["🎉 **Your Trip Results**\n"]
+    has_any_results = False
 
     # FlightBooker results
-    if "FlightBooker" in real_results and real_results["FlightBooker"]["status"] == "success":
-        flights = real_results["FlightBooker"]["data"].get("flights", [])
-        if flights:
-            flight = flights[0]
-            summary_parts.append(f"\n**✈️ Flights** (from Amadeus API)")
-            summary_parts.append(f"- {flight['outbound']['departure']['airport']} → {flight['outbound']['arrival']['airport']}")
-            summary_parts.append(f"- Price: {flight['price']} per person")
-            if "return" in flight:
-                summary_parts.append(f"- Round trip included")
+    if "FlightBooker" in real_results:
+        if real_results["FlightBooker"]["status"] == "success":
+            flights = real_results["FlightBooker"]["data"].get("flights", [])
+            if flights:
+                has_any_results = True
+                flight = flights[0]
+                summary_parts.append(f"\n**✈️ Flights** (from Amadeus API)")
+                summary_parts.append(f"- {flight['outbound']['departure']['airport']} → {flight['outbound']['arrival']['airport']}")
+                summary_parts.append(f"- Price: {flight['price']} per person")
+                if "return" in flight:
+                    summary_parts.append(f"- Round trip included")
+        else:
+            summary_parts.append(f"\n**✈️ Flights**: ⚠️ {real_results['FlightBooker'].get('message', 'API temporarily unavailable')}")
 
     # HotelBooker results
-    if "HotelBooker" in real_results and real_results["HotelBooker"]["status"] == "success":
-        hotels = real_results["HotelBooker"]["data"].get("hotels", [])
-        if hotels:
-            hotel = hotels[0]
-            summary_parts.append(f"\n**🏨 Hotels** (from Amadeus API)")
-            summary_parts.append(f"- {hotel['name']}")
-            summary_parts.append(f"- {hotel['price_per_night']} per night")
-            if hotel.get('rating'):
-                summary_parts.append(f"- Rating: {hotel['rating']}/5")
+    if "HotelBooker" in real_results:
+        if real_results["HotelBooker"]["status"] == "success":
+            hotels = real_results["HotelBooker"]["data"].get("hotels", [])
+            if hotels:
+                has_any_results = True
+                hotel = hotels[0]
+                summary_parts.append(f"\n**🏨 Hotels** (from Amadeus API)")
+                summary_parts.append(f"- {hotel['name']}")
+                summary_parts.append(f"- {hotel['price_per_night']} per night")
+                if hotel.get('rating'):
+                    summary_parts.append(f"- Rating: {hotel['rating']}/5")
+        else:
+            summary_parts.append(f"\n**🏨 Hotels**: ⚠️ {real_results['HotelBooker'].get('message', 'API temporarily unavailable')}")
 
     # RestaurantFinder results
-    if "RestaurantFinder" in real_results and real_results["RestaurantFinder"]["status"] == "success":
-        restaurants = real_results["RestaurantFinder"]["data"].get("restaurants", [])
-        if restaurants:
-            summary_parts.append(f"\n**🍽️ Restaurants** (from Foursquare API)")
-            for r in restaurants[:3]:
-                summary_parts.append(f"- {r['name']} ({r['cuisine']}) - {r['rating']}/5 ⭐")
+    if "RestaurantFinder" in real_results:
+        if real_results["RestaurantFinder"]["status"] == "success":
+            restaurants = real_results["RestaurantFinder"]["data"].get("restaurants", [])
+            if restaurants:
+                has_any_results = True
+                summary_parts.append(f"\n**🍽️ Restaurants** (from Foursquare API)")
+                for r in restaurants[:3]:
+                    summary_parts.append(f"- {r['name']} ({r['cuisine']}) - {r['rating']}/5 ⭐")
+        else:
+            summary_parts.append(f"\n**🍽️ Restaurants**: ⚠️ {real_results['RestaurantFinder'].get('message', 'API temporarily unavailable')}")
 
     # EventsFinder results
-    if "EventsFinder" in real_results and real_results["EventsFinder"]["status"] == "success":
-        activities = real_results["EventsFinder"]["data"].get("activities", [])
-        if activities:
-            summary_parts.append(f"\n**🎭 Activities** (from Amadeus API)")
-            for a in activities[:3]:
-                summary_parts.append(f"- {a['name']} - {a['price']}")
+    if "EventsFinder" in real_results:
+        if real_results["EventsFinder"]["status"] == "success":
+            activities = real_results["EventsFinder"]["data"].get("activities", [])
+            if activities:
+                has_any_results = True
+                summary_parts.append(f"\n**🎭 Activities** (from Amadeus API)")
+                for a in activities[:3]:
+                    summary_parts.append(f"- {a['name']} - {a['price']}")
+        else:
+            summary_parts.append(f"\n**🎭 Activities**: ⚠️ {real_results['EventsFinder'].get('message', 'API temporarily unavailable')}")
 
     summary = "\n".join(summary_parts)
-    summary += "\n\n✨ **All data is LIVE from real travel APIs!**"
+
+    if has_any_results:
+        summary += "\n\n✨ **Data is LIVE from real travel APIs!**"
+    else:
+        summary += "\n\n⚠️ **APIs are still activating - production credentials can take up to 24 hours.**"
+        summary += "\n💡 Try again soon or check your Amadeus dashboard for activation status."
 
     # Update task
     await TaskService.complete_task(db, request.task_id, final_output=summary)
