@@ -102,11 +102,15 @@ class ConductorService:
 
         prompt = f"""You are analyzing if we have enough information to book a trip.
 
-Current Request: "{user_query}"
 {conversation_context}
+Current Request: "{user_query}"
+
+CRITICAL INSTRUCTION: Look at the ENTIRE conversation above. The user's FIRST message contains the destination.
+The current request is answering YOUR follow-up questions with missing details.
 
 EXTRACTION RULES:
-1. Look in BOTH current request AND conversation history - MERGE information across messages
+1. READ THE FULL CONVERSATION HISTORY FIRST - destination is in the first user message
+2. Current request fills in missing details (departure, dates, travelers, budget)
 2. "just me" = 1 traveler, "solo" = 1 traveler, "two of us" = 2
 3. "sfo" = San Francisco, "lax" = Los Angeles, "san" = likely San Diego/San Francisco (ask if unclear)
 4. "25th to 31st" = valid dates, "cot" = "oct" (typo), "dec" = December
@@ -122,11 +126,17 @@ EXAMPLES:
 ❌ WRONG: User said "from san to seattle" → "departure_location": "San"
 ✅ RIGHT: User said "from san to seattle" → ASK "Did you mean San Diego, San Francisco, or San Jose?"
 
+❌ WRONG: First msg: "trip to seattle", Follow-up: "sfo, just me..." → you say destination is "San Francisco"
+✅ RIGHT: First msg: "trip to seattle", Follow-up: "sfo, just me..." → destination is "Seattle", departure is "San Francisco"
+
 ❌ WRONG: Previous msg: "from san", Current msg: "san diego" → you ignore context
 ✅ RIGHT: Previous msg: "from san", Current msg: "san diego" → UPDATE "departure_location": "San Diego"
 
 ❌ WRONG: User said "just me" → you say "missing num_travelers"
 ✅ RIGHT: User said "just me" → "num_travelers": 1
+
+❌ WRONG: Conversation has multiple messages → you only look at latest message
+✅ RIGHT: Conversation has multiple messages → COMBINE information from ALL messages
 
 ❌ WRONG: User said "1000 dollars usd" → you say "missing budget"
 ✅ RIGHT: User said "1000 dollars usd" → "budget": "1000 USD"
