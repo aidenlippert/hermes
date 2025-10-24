@@ -106,16 +106,24 @@ Current Request: "{user_query}"
 {conversation_context}
 
 EXTRACTION RULES:
-1. Look in BOTH current request AND conversation history
-2. "just me" = 1 traveler, "solo" = 1 traveler
-3. "sfo" = San Francisco, "lax" = Los Angeles
+1. Look in BOTH current request AND conversation history - MERGE information across messages
+2. "just me" = 1 traveler, "solo" = 1 traveler, "two of us" = 2
+3. "sfo" = San Francisco, "lax" = Los Angeles, "san" = likely San Diego/San Francisco (ask if unclear)
 4. "25th to 31st" = valid dates, "cot" = "oct" (typo), "dec" = December
 5. "$1000" or "1000 dollars" = valid budget
 6. FIX TYPOS: "cot 25" → "October 25", "nov 3rd" → "November 3rd"
+7. INCOMPLETE CITIES: "san" alone could be San Diego, San Francisco, or San Jose - ASK FOR CLARIFICATION
+8. If user sends JUST a city name (like "san diego") after being asked a question, UPDATE the previous incomplete field
 
 EXAMPLES:
 ❌ WRONG: User said "departing from sfo" → you say "missing departure_location"
 ✅ RIGHT: User said "departing from sfo" → "departure_location": "San Francisco"
+
+❌ WRONG: User said "from san to seattle" → "departure_location": "San"
+✅ RIGHT: User said "from san to seattle" → ASK "Did you mean San Diego, San Francisco, or San Jose?"
+
+❌ WRONG: Previous msg: "from san", Current msg: "san diego" → you ignore context
+✅ RIGHT: Previous msg: "from san", Current msg: "san diego" → UPDATE "departure_location": "San Diego"
 
 ❌ WRONG: User said "just me" → you say "missing num_travelers"
 ✅ RIGHT: User said "just me" → "num_travelers": 1
@@ -126,10 +134,10 @@ EXAMPLES:
 ❌ WRONG: User said "cot 25 to 31" → "travel_dates": "cot 25 to 31"
 ✅ RIGHT: User said "cot 25 to 31" → "travel_dates": "October 25 to 31"
 
-Now extract from the conversation:
-- destination: city/country name from current request or history
-- departure_location: where user is flying FROM ("from X", "departing from X", "X airport")
-- travel_dates: any dates mentioned
+Now extract from the ENTIRE conversation history:
+- destination: city/country name (ask if ambiguous like "san")
+- departure_location: where user is flying FROM (ask if ambiguous like "san")
+- travel_dates: any dates mentioned (ask if invalid/unclear)
 - num_travelers: number of people ("just me"=1, "3 people"=3, "solo"=1)
 - budget: dollar amount mentioned
 

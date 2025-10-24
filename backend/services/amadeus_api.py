@@ -160,7 +160,11 @@ class AmadeusService:
             return flights
 
         except Exception as e:
-            logger.error(f"❌ Amadeus flight search error: {e}")
+            error_msg = str(e)
+            if "401" in error_msg or "Unauthorized" in error_msg:
+                logger.error(f"❌ Amadeus authentication failed - production credentials may still be activating (can take up to 24h)")
+            else:
+                logger.error(f"❌ Amadeus flight search error: {e}")
             return []
 
     @classmethod
@@ -254,7 +258,11 @@ class AmadeusService:
             return hotels
 
         except Exception as e:
-            logger.error(f"❌ Amadeus hotel search error: {e}")
+            error_msg = str(e)
+            if "401" in error_msg or "Unauthorized" in error_msg:
+                logger.error(f"❌ Amadeus authentication failed - production credentials may still be activating (can take up to 24h)")
+            else:
+                logger.error(f"❌ Amadeus hotel search error: {e}")
             return []
 
     @classmethod
