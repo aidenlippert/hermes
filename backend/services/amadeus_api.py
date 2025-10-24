@@ -105,7 +105,7 @@ class AmadeusService:
 
             async with httpx.AsyncClient() as client:
                 response = await client.get(
-                    f"{AMADEUS_BASE_URL}/shopping/flight-offers",
+                    "https://api.amadeus.com/v2/shopping/flight-offers",
                     headers=headers,
                     params=params,
                     timeout=15.0
@@ -207,7 +207,7 @@ class AmadeusService:
 
             async with httpx.AsyncClient() as client:
                 response = await client.get(
-                    f"{AMADEUS_BASE_URL}/reference-data/locations/hotels/by-city",
+                    "https://api.amadeus.com/v1/reference-data/locations/hotels/by-city",
                     headers=headers,
                     params=params,
                     timeout=15.0
@@ -232,7 +232,7 @@ class AmadeusService:
 
             async with httpx.AsyncClient() as client:
                 response = await client.get(
-                    f"{AMADEUS_BASE_URL}/shopping/hotel-offers",
+                    "https://api.amadeus.com/v3/shopping/hotel-offers",
                     headers=headers,
                     params=offer_params,
                     timeout=15.0
