@@ -599,7 +599,7 @@ async def approve_agents(
                 })
 
                 # Execute with 30 second timeout
-                from backend.services.real_agents import AGENT_EXECUTORS
+                from backend.services.real_agents_v2 import AGENT_EXECUTORS
                 if agent_name in AGENT_EXECUTORS:
                     result = await asyncio.wait_for(
                         AGENT_EXECUTORS[agent_name](extracted_info),

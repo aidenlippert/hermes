@@ -1,21 +1,36 @@
 """
-Real Agent Execution with External APIs
+Real Agent Execution with External APIs (Version 2)
 
-Executes travel agents using real API integrations:
-- FlightBooker: Amadeus API
-- HotelBooker: Amadeus API
-- RestaurantFinder: Foursquare API
-- EventsFinder: Amadeus API
+This version includes proper fallback to mock data when APIs fail.
+Executes travel agents using real API integrations with fallback:
+- FlightBooker: Amadeus API → Mock Data
+- HotelBooker: Amadeus API → Mock Data
+- RestaurantFinder: Foursquare API → Mock Data
+- EventsFinder: Amadeus API → Mock Data
 """
 
 import logging
 from typing import Dict, Any, Optional
-from backend.services.amadeus_api import AmadeusService
-from backend.services.foursquare_api import FoursquareService
 from backend.services.llm_provider import get_llm_provider
 from backend.services.mock_travel_api import mock_travel_api
 
 logger = logging.getLogger(__name__)
+
+# Try to import real APIs, but don't fail if they're broken
+try:
+    from backend.services.amadeus_api import AmadeusService
+    AMADEUS_AVAILABLE = True
+except Exception as e:
+    logger.warning(f"⚠️ Amadeus API not available: {e}")
+    AMADEUS_AVAILABLE = False
+
+try:
+    from backend.services.foursquare_api import FoursquareService
+    FOURSQUARE_AVAILABLE = True
+except Exception as e:
+    logger.warning(f"⚠️ Foursquare API not available: {e}")
+    FOURSQUARE_AVAILABLE = False
+
 
 # Cache for location resolutions to avoid hitting Gemini rate limits
 _location_cache = {}
@@ -105,13 +120,7 @@ Now for: {location_name}"""
 
 async def execute_flight_booker(extracted_info: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Execute FlightBooker agent with Amadeus API.
-
-    Args:
-        extracted_info: User's travel requirements
-
-    Returns:
-        Flight search results
+    Execute FlightBooker agent with Amadeus API or Mock Data.
     """
     try:
         destination = extracted_info.get("destination", "")
@@ -119,7 +128,7 @@ async def execute_flight_booker(extracted_info: Dict[str, Any]) -> Dict[str, Any
         travel_dates = extracted_info.get("travel_dates", "")
         num_travelers = extracted_info.get("num_travelers", 1)
 
-        # Dynamically resolve airport codes and coordinates
+        # Dynamically resolve airport codes
         logger.info(f"🔍 Resolving locations: {departure_location} → {destination}")
 
         origin_info = await resolve_location_info(departure_location, is_destination=False)
@@ -142,44 +151,38 @@ async def execute_flight_booker(extracted_info: Dict[str, Any]) -> Dict[str, Any
 
         logger.info(f"✈️ Searching flights: {origin_code} → {dest_code}")
 
-        # Try Amadeus first, fall back to mock if it fails
-        try:
-            flights = await AmadeusService.search_flights(
-                origin=origin_code,
-                destination=dest_code,
-                departure_date=departure_date,
-                return_date=return_date,
-                adults=int(num_travelers) if num_travelers else 1,
-                max_results=3
-            )
-            if not flights:
-                raise Exception("Amadeus returned empty results")
-        except Exception as amadeus_error:
-            logger.warning(f"⚠️ Amadeus failed, using mock data: {amadeus_error}")
-            # Use mock data instead
-            result = await mock_travel_api.search_flights(
-                origin=origin_code,
-                destination=dest_code,
-                departure_date=departure_date,
-                return_date=return_date,
-                passengers=int(num_travelers) if num_travelers else 1
-            )
-            return result
+        # Try real API if available
+        if AMADEUS_AVAILABLE:
+            try:
+                flights = await AmadeusService.search_flights(
+                    origin=origin_code,
+                    destination=dest_code,
+                    departure_date=departure_date,
+                    return_date=return_date,
+                    adults=int(num_travelers) if num_travelers else 1,
+                    max_results=3
+                )
 
-        if not flights:
-            return {
-                "status": "error",
-                "message": "No flights found",
-                "data": []
-            }
+                if flights:
+                    return {
+                        "status": "success",
+                        "data": {
+                            "flights": flights,
+                            "summary": f"Found {len(flights)} flight options from {origin_code} to {dest_code}"
+                        }
+                    }
+            except Exception as e:
+                logger.warning(f"⚠️ Amadeus API failed: {e}")
 
-        return {
-            "status": "success",
-            "data": {
-                "flights": flights,
-                "summary": f"Found {len(flights)} flight options from {origin_code} to {dest_code}"
-            }
-        }
+        # Fall back to mock data
+        logger.info("📦 Using mock flight data")
+        return await mock_travel_api.search_flights(
+            origin=origin_code,
+            destination=dest_code,
+            departure_date=departure_date,
+            return_date=return_date,
+            passengers=int(num_travelers) if num_travelers else 1
+        )
 
     except Exception as e:
         logger.error(f"❌ FlightBooker execution failed: {e}")
@@ -192,19 +195,13 @@ async def execute_flight_booker(extracted_info: Dict[str, Any]) -> Dict[str, Any
 
 async def execute_hotel_booker(extracted_info: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Execute HotelBooker agent with Amadeus API.
-
-    Args:
-        extracted_info: User's travel requirements
-
-    Returns:
-        Hotel search results
+    Execute HotelBooker agent with Amadeus API or Mock Data.
     """
     try:
         destination = extracted_info.get("destination", "")
         num_travelers = extracted_info.get("num_travelers", 1)
 
-        # Dynamically resolve destination info
+        # Resolve destination info
         dest_info = await resolve_location_info(destination, is_destination=True)
 
         if not dest_info:
@@ -220,30 +217,38 @@ async def execute_hotel_booker(extracted_info: Dict[str, Any]) -> Dict[str, Any]
         check_in = "2025-10-25"
         check_out = "2025-10-30"
 
-        logger.info(f"🏨 Searching hotels in {city_code}")
+        logger.info(f"🏨 Searching hotels in {destination}")
 
-        hotels = await AmadeusService.search_hotels(
-            city_code=city_code,
-            check_in=check_in,
-            check_out=check_out,
-            adults=int(num_travelers) if num_travelers else 1,
-            max_results=5
+        # Try real API if available
+        if AMADEUS_AVAILABLE:
+            try:
+                hotels = await AmadeusService.search_hotels(
+                    city_code=city_code,
+                    check_in=check_in,
+                    check_out=check_out,
+                    adults=int(num_travelers) if num_travelers else 1,
+                    max_results=5
+                )
+
+                if hotels:
+                    return {
+                        "status": "success",
+                        "data": {
+                            "hotels": hotels,
+                            "summary": f"Found {len(hotels)} hotels in {destination}"
+                        }
+                    }
+            except Exception as e:
+                logger.warning(f"⚠️ Amadeus Hotels API failed: {e}")
+
+        # Fall back to mock data
+        logger.info("📦 Using mock hotel data")
+        return await mock_travel_api.search_hotels(
+            location=destination,
+            checkin=check_in,
+            checkout=check_out,
+            guests=int(num_travelers) if num_travelers else 1
         )
-
-        if not hotels:
-            return {
-                "status": "error",
-                "message": "No hotels found",
-                "data": []
-            }
-
-        return {
-            "status": "success",
-            "data": {
-                "hotels": hotels,
-                "summary": f"Found {len(hotels)} hotel options in {destination.title()}"
-            }
-        }
 
     except Exception as e:
         logger.error(f"❌ HotelBooker execution failed: {e}")
@@ -256,18 +261,12 @@ async def execute_hotel_booker(extracted_info: Dict[str, Any]) -> Dict[str, Any]
 
 async def execute_restaurant_finder(extracted_info: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Execute RestaurantFinder agent with Foursquare API.
-
-    Args:
-        extracted_info: User's travel requirements
-
-    Returns:
-        Restaurant recommendations
+    Execute RestaurantFinder agent with Foursquare API or Mock Data.
     """
     try:
         destination = extracted_info.get("destination", "")
 
-        # Dynamically resolve destination coordinates
+        # Resolve destination info
         dest_info = await resolve_location_info(destination, is_destination=True)
 
         if not dest_info:
@@ -279,27 +278,30 @@ async def execute_restaurant_finder(extracted_info: Dict[str, Any]) -> Dict[str,
 
         logger.info(f"🍽️ Searching restaurants in {destination}")
 
-        restaurants = await FoursquareService.search_restaurants(
-            location=destination.title(),
-            latitude=dest_info["latitude"],
-            longitude=dest_info["longitude"],
-            limit=10
-        )
+        # Try real API if available
+        if FOURSQUARE_AVAILABLE:
+            try:
+                restaurants = await FoursquareService.search_restaurants(
+                    location=destination.title(),
+                    latitude=dest_info["latitude"],
+                    longitude=dest_info["longitude"],
+                    limit=10
+                )
 
-        if not restaurants:
-            return {
-                "status": "error",
-                "message": "No restaurants found",
-                "data": []
-            }
+                if restaurants:
+                    return {
+                        "status": "success",
+                        "data": {
+                            "restaurants": restaurants,
+                            "summary": f"Found {len(restaurants)} restaurants in {destination}"
+                        }
+                    }
+            except Exception as e:
+                logger.warning(f"⚠️ Foursquare API failed: {e}")
 
-        return {
-            "status": "success",
-            "data": {
-                "restaurants": restaurants[:5],
-                "summary": f"Found {len(restaurants)} restaurant recommendations in {destination.title()}"
-            }
-        }
+        # Fall back to mock data
+        logger.info("📦 Using mock restaurant data")
+        return await mock_travel_api.search_restaurants(location=destination)
 
     except Exception as e:
         logger.error(f"❌ RestaurantFinder execution failed: {e}")
@@ -312,18 +314,12 @@ async def execute_restaurant_finder(extracted_info: Dict[str, Any]) -> Dict[str,
 
 async def execute_events_finder(extracted_info: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Execute EventsFinder agent with Amadeus API.
-
-    Args:
-        extracted_info: User's travel requirements
-
-    Returns:
-        Activities and tours
+    Execute EventsFinder agent with Amadeus API or Mock Data.
     """
     try:
         destination = extracted_info.get("destination", "")
 
-        # Dynamically resolve destination coordinates
+        # Resolve destination info
         dest_info = await resolve_location_info(destination, is_destination=True)
 
         if not dest_info:
@@ -333,29 +329,34 @@ async def execute_events_finder(extracted_info: Dict[str, Any]) -> Dict[str, Any
                 "data": []
             }
 
+        city_code = dest_info["airport"]
+
         logger.info(f"🎭 Searching activities in {destination}")
 
-        activities = await AmadeusService.search_activities(
-            latitude=dest_info["latitude"],
-            longitude=dest_info["longitude"],
-            radius=20,
-            max_results=10
-        )
+        # Try real API if available
+        if AMADEUS_AVAILABLE:
+            try:
+                activities = await AmadeusService.search_activities(
+                    latitude=dest_info["latitude"],
+                    longitude=dest_info["longitude"],
+                    radius=20,
+                    max_results=5
+                )
 
-        if not activities:
-            return {
-                "status": "error",
-                "message": "No activities found",
-                "data": []
-            }
+                if activities:
+                    return {
+                        "status": "success",
+                        "data": {
+                            "activities": activities,
+                            "summary": f"Found {len(activities)} activities in {destination}"
+                        }
+                    }
+            except Exception as e:
+                logger.warning(f"⚠️ Amadeus Activities API failed: {e}")
 
-        return {
-            "status": "success",
-            "data": {
-                "activities": activities[:5],
-                "summary": f"Found {len(activities)} activities and tours in {destination.title()}"
-            }
-        }
+        # Fall back to mock data
+        logger.info("📦 Using mock activity data")
+        return await mock_travel_api.search_activities(location=destination)
 
     except Exception as e:
         logger.error(f"❌ EventsFinder execution failed: {e}")
@@ -366,7 +367,7 @@ async def execute_events_finder(extracted_info: Dict[str, Any]) -> Dict[str, Any
         }
 
 
-# Agent execution mapping
+# Registry of agent executors
 AGENT_EXECUTORS = {
     "FlightBooker": execute_flight_booker,
     "HotelBooker": execute_hotel_booker,
@@ -380,7 +381,7 @@ async def execute_real_agents(
     extracted_info: Dict[str, Any]
 ) -> Dict[str, Dict[str, Any]]:
     """
-    Execute all approved agents with real API calls.
+    Execute all approved agents with real API calls or mock data fallback.
 
     Args:
         agents: List of approved agents
