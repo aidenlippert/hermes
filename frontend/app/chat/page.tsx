@@ -94,6 +94,90 @@ const mockAgents = [
   }
 ]
 
+// Mock conversation histories
+const chatHistories: Record<string, Message[]> = {
+  "Travel Planning Assistant": [
+    {
+      id: "1",
+      role: "user",
+      content: "I need to plan a trip to Paris next month",
+      timestamp: new Date(Date.now() - 7200000),
+      agents: []
+    },
+    {
+      id: "2",
+      role: "assistant",
+      content: "I'd be happy to help you plan your trip to Paris! I've found specialized agents for flights, hotels, and local activities. Let me coordinate them to create the perfect itinerary for you.",
+      timestamp: new Date(Date.now() - 7190000),
+      agents: [{id: "flight-1", name: "FlightFinder Pro"}, {id: "hotel-1", name: "HotelScout AI"}]
+    }
+  ],
+  "Code Review Session": [
+    {
+      id: "1",
+      role: "user",
+      content: "Can you review my React component for performance issues?",
+      timestamp: new Date(Date.now() - 86400000),
+      agents: []
+    },
+    {
+      id: "2",
+      role: "assistant",
+      content: "I'll analyze your React component for performance optimization opportunities. I've engaged our code analysis agents to identify potential improvements.",
+      timestamp: new Date(Date.now() - 86390000),
+      agents: [{id: "code-1", name: "CodeAssist Ultra"}]
+    }
+  ],
+  "Data Analysis Project": [
+    {
+      id: "1",
+      role: "user",
+      content: "I have a dataset that needs analysis and visualization",
+      timestamp: new Date(Date.now() - 172800000),
+      agents: []
+    },
+    {
+      id: "2",
+      role: "assistant",
+      content: "I'll help you analyze and visualize your dataset. Our data analysis agents can process your data and create insightful visualizations.",
+      timestamp: new Date(Date.now() - 172790000),
+      agents: []
+    }
+  ],
+  "Content Creation": [
+    {
+      id: "1",
+      role: "user",
+      content: "Help me write a blog post about AI trends in 2024",
+      timestamp: new Date(Date.now() - 259200000),
+      agents: []
+    },
+    {
+      id: "2",
+      role: "assistant",
+      content: "I'll help you create an engaging blog post about AI trends. Let me coordinate our content creation agents to research and write compelling content.",
+      timestamp: new Date(Date.now() - 259190000),
+      agents: []
+    }
+  ],
+  "Market Research": [
+    {
+      id: "1",
+      role: "user",
+      content: "I need market research on the SaaS industry",
+      timestamp: new Date(Date.now() - 345600000),
+      agents: []
+    },
+    {
+      id: "2",
+      role: "assistant",
+      content: "I'll conduct comprehensive market research on the SaaS industry. Our research agents will gather data on market trends, competitors, and opportunities.",
+      timestamp: new Date(Date.now() - 345590000),
+      agents: []
+    }
+  ]
+}
+
 const suggestedPrompts = [
   {
     icon: Globe,
@@ -128,6 +212,7 @@ export default function ChatPage() {
   const [awaitingApproval, setAwaitingApproval] = useState(false)
   const [showSidebar, setShowSidebar] = useState(true)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [activeChat, setActiveChat] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [mounted, setMounted] = useState(false)
@@ -294,7 +379,14 @@ export default function ChatPage() {
                 </Button>
               </div>
 
-              <Button className="w-full" size="lg">
+              <Button
+                className="w-full"
+                size="lg"
+                onClick={() => {
+                  setMessages(mockMessages)
+                  setActiveChat(null)
+                }}
+              >
                 <Plus className="w-5 h-5 mr-2" />
                 New Chat
               </Button>
@@ -310,16 +402,27 @@ export default function ChatPage() {
                   <button
                     key={index}
                     onClick={() => {
-                      // Load the selected chat
-                      setMessages([{
-                        id: "1",
-                        role: "assistant",
-                        content: `Welcome back to your ${chat}! How can I help you continue?`,
-                        timestamp: new Date(),
-                        agents: []
-                      }])
+                      // Load the selected chat history
+                      const history = chatHistories[chat]
+                      if (history) {
+                        setMessages([
+                          ...history,
+                          {
+                            id: Date.now().toString(),
+                            role: "assistant",
+                            content: `Welcome back to your ${chat}! I've loaded your previous conversation. How can I help you continue?`,
+                            timestamp: new Date(),
+                            agents: []
+                          }
+                        ])
+                        setActiveChat(chat)
+                      }
                     }}
-                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors group"
+                    className={`w-full text-left px-3 py-2 rounded-lg transition-colors group ${
+                      activeChat === chat
+                        ? "bg-blue-100 dark:bg-blue-900/30 border-l-2 border-blue-500"
+                        : "hover:bg-gray-100 dark:hover:bg-gray-800"
+                    }`}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -538,7 +641,9 @@ export default function ChatPage() {
                             : "bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800"
                         }`}
                       >
-                        <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                        <p className={`text-sm leading-relaxed whitespace-pre-wrap break-words ${
+                          message.role === "user" ? "text-white" : "text-gray-900 dark:text-gray-100"
+                        }`}>
                           {message.content}
                         </p>
                         {message.agents && message.agents.length > 0 && (
@@ -603,7 +708,7 @@ export default function ChatPage() {
                   </div>
                   <div className="flex-1 max-w-2xl">
                     <div className="rounded-2xl px-5 py-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
-                      <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap break-words text-gray-900 dark:text-gray-100">
                         {streamingText}
                         <span className="inline-block w-1 h-4 bg-blue-500 ml-1 animate-pulse" />
                       </p>
