@@ -11,8 +11,11 @@ interface User {
 }
 
 interface AuthState {
-  token: string | null;
+  accessToken: string | null;
+  refreshToken: string | null;
   user: User | null;
+  isAuthenticated: boolean;
+  setTokens: (accessToken: string, refreshToken: string) => void;
   setAuth: (token: string, user: User) => void;
   logout: () => void;
 }
@@ -20,10 +23,13 @@ interface AuthState {
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
-      token: null,
+      accessToken: null,
+      refreshToken: null,
       user: null,
-      setAuth: (token, user) => set({ token, user }),
-      logout: () => set({ token: null, user: null }),
+      isAuthenticated: false,
+      setTokens: (accessToken, refreshToken) => set({ accessToken, refreshToken, isAuthenticated: true }),
+      setAuth: (token, user) => set({ accessToken: token, user, isAuthenticated: true }),
+      logout: () => set({ accessToken: null, refreshToken: null, user: null, isAuthenticated: false }),
     }),
     {
       name: "hermes-auth",

@@ -1,0 +1,558 @@
+/**
+ * Mesh Protocol v0.1 - Agent Communication and Coordination Protocol (ACCP)
+ * 
+ * This defines the "TCP/IP for AI Agents" - the universal substrate
+ * for autonomous cognition to coordinate, collaborate, and transact.
+ * 
+ * Design Principles:
+ * - Federated: No single point of failure
+ * - Semantic: Capability-based discovery via embeddings
+ * - Trustless: Cryptographic signatures + DIDs
+ * - Composable: Agents can orchestrate other agents
+ * - Economic: Built-in marketplace and reputation
+ */
+
+syntax = "proto3";
+
+package mesh.protocol.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// ============================================================================
+// Core Identity & Trust
+// ============================================================================
+
+message AgentRegistration {
+  // Decentralized identifier (did:web:example.com or did:key:...)
+  string agent_id = 1;
+  
+  // DID of owner (human or organization)
+  string owner = 2;
+  
+  // Human-readable name
+  string name = 3;
+  
+  // Capabilities this agent can perform
+  repeated Capability capabilities = 4;
+  
+  // Supported locales/regions
+  repeated string locales = 5;
+  
+  // Pricing model for this agent's services
+  CostModel cost_model = 6;
+  
+  // WebSocket or HTTP endpoint for communication
+  string endpoint = 7;
+  
+  // Public key for signature verification (ed25519:base64)
+  string public_key = 8;
+  
+  // Trust score (0.0 to 1.0, updated by reputation system)
+  float trust_score = 9;
+  
+  // Additional metadata
+  map<string, string> meta = 10;
+  
+  // Registration timestamp
+  google.protobuf.Timestamp registered_at = 11;
+  
+  // Owner's signature over canonical form
+  bytes owner_signature = 12;
+}
+
+message Capability {
+  // Capability identifier (e.g., "hotel_search", "flight_book")
+  string name = 1;
+  
+  // Human-readable description
+  string description = 2;
+  
+  // Agent's confidence in this capability (0.0 to 1.0)
+  float confidence = 3;
+  
+  // Estimated cost per invocation
+  float cost = 4;
+  
+  // Estimated latency in seconds
+  float latency = 5;
+  
+  // Vector embedding for semantic search (768-dim by default)
+  repeated float embedding = 6;
+  
+  // JSON schema for inputs this capability accepts
+  string input_schema = 7;
+  
+  // JSON schema for outputs this capability produces
+  string output_schema = 8;
+}
+
+message CostModel {
+  // Currency (USD, EUR, MESH_TOKEN, etc.)
+  string currency = 1;
+  
+  // Type: "fixed", "per_use", "per_token", "auction"
+  string type = 2;
+  
+  // Base amount
+  float amount = 3;
+  
+  // Additional parameters (e.g., {"per_token": "0.001"})
+  map<string, string> params = 4;
+}
+
+// ============================================================================
+// Task Contracts - The Core Coordination Primitive
+// ============================================================================
+
+message TaskContract {
+  // Unique contract identifier
+  string contract_id = 1;
+  
+  // DID of issuer (human or agent)
+  string issuer = 2;
+  
+  // Intent/capability being requested (e.g., "book_hotel")
+  string intent = 3;
+  
+  // Structured context (JSON)
+  map<string, string> context = 4;
+  
+  // Additional constraints
+  repeated string constraints = 5;
+  
+  // Expected deliverables
+  repeated Deliverable deliverables = 6;
+  
+  // Validation specification
+  ValidatorSpec validator = 7;
+  
+  // Reward for completion
+  Reward reward = 8;
+  
+  // Contract lifecycle status
+  ContractStatus status = 9;
+  
+  // Creation timestamp
+  google.protobuf.Timestamp created_at = 10;
+  
+  // Expiration timestamp
+  google.protobuf.Timestamp expires_at = 11;
+  
+  // Issuer's signature over canonical form
+  bytes issuer_signature = 12;
+  
+  // Awarded agent(s)
+  repeated string awarded_to = 13;
+  
+  // Contract version for protocol evolution
+  string protocol_version = 14;
+  
+  // Nonce for replay protection
+  string nonce = 15;
+  
+  // Priority (0=low, 5=normal, 10=urgent)
+  int32 priority = 16;
+  
+  // Tags for categorization
+  repeated string tags = 17;
+  
+  // Embedding for semantic routing
+  repeated float embedding = 18;
+}
+
+enum ContractStatus {
+  UNKNOWN = 0;
+  OPEN = 1;           // Accepting bids
+  BIDDING = 2;        // Bids received, auction in progress
+  AWARDED = 3;        // Contract awarded to agent(s)
+  IN_PROGRESS = 4;    // Agent(s) executing
+  DELIVERED = 5;      // Agent(s) delivered results
+  VALIDATED = 6;      // Results validated
+  SETTLED = 7;        // Payment settled, contract complete
+  CANCELLED = 8;      // Cancelled before completion
+  DISPUTED = 9;       // Under dispute resolution
+  FAILED = 10;        // Execution failed
+}
+
+message Deliverable {
+  // Type: "data", "confirmation", "action", "proof"
+  string type = 1;
+  
+  // Description of deliverable
+  string description = 2;
+  
+  // JSON schema for deliverable
+  string schema = 3;
+  
+  // Whether this deliverable is required
+  bool required = 4;
+}
+
+message ValidatorSpec {
+  // Type: "confirmation_code", "receipt", "signature", "human_review"
+  string type = 1;
+  
+  // DID of validator agent (if applicable)
+  string validator_agent = 2;
+  
+  // Additional validation parameters
+  map<string, string> params = 3;
+  
+  // Whether validation is required before settlement
+  bool required = 4;
+}
+
+message Reward {
+  // Currency
+  string currency = 1;
+  
+  // Amount
+  float amount = 2;
+  
+  // Escrow address/account (optional)
+  string escrow = 3;
+  
+  // Release conditions
+  map<string, string> conditions = 4;
+  
+  // Bonus for early completion (optional)
+  float early_bonus = 5;
+  
+  // Penalty for late completion (optional)
+  float late_penalty = 6;
+}
+
+// ============================================================================
+// Bidding & Auction
+// ============================================================================
+
+message Bid {
+  // Unique bid identifier
+  string bid_id = 1;
+  
+  // Contract being bid on
+  string contract_id = 2;
+  
+  // DID of bidding agent
+  string agent_id = 3;
+  
+  // Proposed price
+  float price = 4;
+  
+  // Currency
+  string currency = 5;
+  
+  // Estimated time to completion (seconds)
+  float eta_seconds = 6;
+  
+  // Confidence level (0.0 to 1.0)
+  float confidence = 7;
+  
+  // Proposal/approach notes
+  string notes = 8;
+  
+  // Timestamp
+  google.protobuf.Timestamp created_at = 9;
+  
+  // Agent's signature
+  bytes agent_signature = 10;
+  
+  // Nonce for replay protection
+  string nonce = 11;
+  
+  // Expiration (bid is only valid until this time)
+  google.protobuf.Timestamp expires_at = 12;
+  
+  // Stake/deposit (optional, for high-value contracts)
+  float stake = 13;
+  
+  // Sub-bids if agent plans to delegate subtasks
+  repeated SubBid sub_bids = 14;
+}
+
+message SubBid {
+  // Subtask description
+  string subtask = 1;
+  
+  // Agent who will handle this subtask
+  string agent_id = 2;
+  
+  // Cost allocation
+  float cost = 3;
+}
+
+message AuctionResult {
+  // Contract ID
+  string contract_id = 1;
+  
+  // Winning bid(s)
+  repeated string winning_bid_ids = 2;
+  
+  // Winning agent(s)
+  repeated string winning_agent_ids = 3;
+  
+  // Auction strategy used
+  string strategy = 4;
+  
+  // Timestamp
+  google.protobuf.Timestamp awarded_at = 5;
+  
+  // Total bids received
+  int32 total_bids = 6;
+}
+
+// ============================================================================
+// Execution & Status Updates
+// ============================================================================
+
+message StatusUpdate {
+  // Contract ID
+  string contract_id = 1;
+  
+  // Agent providing update
+  string agent_id = 2;
+  
+  // Status
+  string status = 3;
+  
+  // Progress (0.0 to 1.0)
+  float progress = 4;
+  
+  // Human-readable message
+  string message = 5;
+  
+  // Structured data (JSON)
+  map<string, string> data = 6;
+  
+  // Timestamp
+  google.protobuf.Timestamp updated_at = 7;
+  
+  // Agent's signature
+  bytes agent_signature = 8;
+  
+  // References to shared context keys
+  repeated string context_refs = 9;
+}
+
+message ContractDelivery {
+  // Contract ID
+  string contract_id = 1;
+  
+  // Agent making delivery
+  string agent_id = 2;
+  
+  // Deliverables
+  repeated DeliveryItem items = 3;
+  
+  // Timestamp
+  google.protobuf.Timestamp delivered_at = 4;
+  
+  // Agent's signature
+  bytes agent_signature = 5;
+}
+
+message DeliveryItem {
+  // Deliverable type
+  string type = 1;
+  
+  // Data (base64 encoded if binary)
+  string data = 2;
+  
+  // Content type
+  string content_type = 3;
+  
+  // Metadata
+  map<string, string> meta = 4;
+}
+
+// ============================================================================
+// Shared Context (Blackboard)
+// ============================================================================
+
+message ContextEntry {
+  // Key
+  string key = 1;
+  
+  // Value (JSON or base64 for binary)
+  string value = 2;
+  
+  // Writer DID
+  string writer = 3;
+  
+  // Timestamp
+  google.protobuf.Timestamp written_at = 4;
+  
+  // Writer's signature
+  bytes writer_signature = 5;
+  
+  // Access control list
+  AccessControl acl = 6;
+  
+  // TTL in seconds (0 = permanent)
+  int32 ttl = 7;
+  
+  // Vector embedding for semantic search
+  repeated float embedding = 8;
+  
+  // Tags for categorization
+  repeated string tags = 9;
+}
+
+message AccessControl {
+  // DIDs allowed to read
+  repeated string read_allowed = 1;
+  
+  // DIDs allowed to write
+  repeated string write_allowed = 2;
+  
+  // Whether this is public (read by anyone)
+  bool public = 3;
+}
+
+// ============================================================================
+// Reputation & Trust
+// ============================================================================
+
+message ReputationScore {
+  // Agent DID
+  string agent_id = 1;
+  
+  // Overall score (0.0 to 1.0)
+  float overall = 2;
+  
+  // Category-specific scores
+  map<string, float> category_scores = 3;
+  
+  // Total contracts completed
+  int32 contracts_completed = 4;
+  
+  // Total contracts failed
+  int32 contracts_failed = 5;
+  
+  // Average rating from validators
+  float avg_rating = 6;
+  
+  // Last updated
+  google.protobuf.Timestamp updated_at = 7;
+}
+
+message ReputationEvent {
+  // Event type: "completion", "failure", "dispute", "rating"
+  string event_type = 1;
+  
+  // Agent DID
+  string agent_id = 2;
+  
+  // Contract ID
+  string contract_id = 3;
+  
+  // Impact (-1.0 to 1.0)
+  float impact = 4;
+  
+  // Reason/notes
+  string reason = 5;
+  
+  // Reporter DID
+  string reporter = 6;
+  
+  // Timestamp
+  google.protobuf.Timestamp occurred_at = 7;
+}
+
+// ============================================================================
+// Events (Pub/Sub Messages)
+// ============================================================================
+
+message MeshEvent {
+  // Event ID
+  string event_id = 1;
+  
+  // Event type
+  EventType type = 2;
+  
+  // Payload (one of the oneof fields)
+  oneof payload {
+    TaskContract contract_announced = 10;
+    Bid bid_submitted = 11;
+    AuctionResult contract_awarded = 12;
+    StatusUpdate status_updated = 13;
+    ContractDelivery contract_delivered = 14;
+    AgentRegistration agent_joined = 15;
+    ReputationEvent reputation_updated = 16;
+  }
+  
+  // Timestamp
+  google.protobuf.Timestamp timestamp = 20;
+  
+  // Sender DID
+  string sender = 21;
+  
+  // Sender's signature
+  bytes sender_signature = 22;
+}
+
+enum EventType {
+  EVENT_UNKNOWN = 0;
+  CONTRACT_ANNOUNCED = 1;
+  BID_SUBMITTED = 2;
+  CONTRACT_AWARDED = 3;
+  STATUS_UPDATED = 4;
+  CONTRACT_DELIVERED = 5;
+  AGENT_JOINED = 6;
+  AGENT_LEFT = 7;
+  REPUTATION_UPDATED = 8;
+  CONTEXT_UPDATED = 9;
+  DISPUTE_RAISED = 10;
+}
+
+// ============================================================================
+// Discovery & Query
+// ============================================================================
+
+message CapabilityQuery {
+  // Query string
+  string query = 1;
+  
+  // Query embedding for semantic search
+  repeated float embedding = 2;
+  
+  // Filters
+  map<string, string> filters = 3;
+  
+  // Max results
+  int32 limit = 4;
+  
+  // Minimum confidence threshold
+  float min_confidence = 5;
+  
+  // Preferred locales
+  repeated string locales = 6;
+  
+  // Max price
+  float max_price = 7;
+}
+
+message CapabilityQueryResult {
+  // Matching agents
+  repeated AgentMatch matches = 1;
+  
+  // Query ID for reference
+  string query_id = 2;
+  
+  // Timestamp
+  google.protobuf.Timestamp timestamp = 3;
+}
+
+message AgentMatch {
+  // Agent registration
+  AgentRegistration agent = 1;
+  
+  // Matching capability
+  Capability capability = 2;
+  
+  // Similarity score (0.0 to 1.0)
+  float similarity = 3;
+  
+  // Estimated cost for this query
+  float estimated_cost = 4;
+}

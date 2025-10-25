@@ -198,6 +198,251 @@ class AgentRating(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
+
+# ============================================================
+# MESH PROTOCOL MODELS
+# ============================================================
+
+class ContractStatus(str, Enum):
+    """Contract lifecycle states"""
+    OPEN = "open"
+    BIDDING = "bidding"
+    AWARDED = "awarded"
+    IN_PROGRESS = "in_progress"
+    DELIVERED = "delivered"
+    VALIDATED = "validated"
+    SETTLED = "settled"
+    CANCELLED = "cancelled"
+    FAILED = "failed"
+
+
+class Contract(Base):
+    """Mesh protocol contracts"""
+    __tablename__ = "contracts"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4())[:12])
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    
+    # Contract details
+    intent = Column(String, nullable=False, index=True)  # e.g., "flight_search"
+    context = Column(JSON, nullable=False)  # Task parameters
+    reward_amount = Column(Float, default=5.0)
+    reward_currency = Column(String, default="USD")
+    
+    # Status
+    status = Column(SQLEnum(ContractStatus), default=ContractStatus.OPEN, nullable=False, index=True)
+    awarded_to = Column(String, ForeignKey("agents.id", ondelete="SET NULL"), nullable=True)
+    
+    # Timing
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    expires_at = Column(DateTime(timezone=True), nullable=True)
+    awarded_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Relationships
+    bids = relationship("Bid", back_populates="contract", cascade="all, delete-orphan")
+    delivery = relationship("Delivery", back_populates="contract", uselist=False, cascade="all, delete-orphan")
+    
+    def __repr__(self):
+        return f"<Contract {self.id} - {self.intent}>"
+
+
+class Bid(Base):
+    """Agent bids on contracts"""
+    __tablename__ = "bids"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4())[:8])
+    contract_id = Column(String, ForeignKey("contracts.id", ondelete="CASCADE"), nullable=False, index=True)
+    agent_id = Column(String, ForeignKey("agents.id", ondelete="CASCADE"), nullable=False)
+    
+    # Bid details
+    price = Column(Float, nullable=False)
+    eta_seconds = Column(Float, nullable=False)
+    confidence = Column(Float, nullable=False)  # 0.0 - 1.0
+    
+    # Metadata
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    contract = relationship("Contract", back_populates="bids")
+    
+    def __repr__(self):
+        return f"<Bid {self.id} - ${self.price}>"
+
+
+class Delivery(Base):
+    """Contract delivery results"""
+    __tablename__ = "deliveries"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4())[:8])
+    contract_id = Column(String, ForeignKey("contracts.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    agent_id = Column(String, ForeignKey("agents.id", ondelete="SET NULL"), nullable=True)
+    
+    # Result data
+    data = Column(JSON, nullable=False)
+    
+    # Validation
+    is_validated = Column(Boolean, default=False)
+    validation_score = Column(Float, nullable=True)  # 0.0 - 1.0
+    
+    # Timing
+    delivered_at = Column(DateTime(timezone=True), server_default=func.now())
+    validated_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Relationships
+    contract = relationship("Contract", back_populates="delivery")
+    
+    def __repr__(self):
+        return f"<Delivery {self.id} - Contract {self.contract_id}>"
+
+
+class UserPreference(Base):
+    """User agent selection preferences"""
+    __tablename__ = "user_preferences"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    
+    # Weights (must sum to 100)
+    price_weight = Column(Float, default=25.0)
+    performance_weight = Column(Float, default=25.0)
+    speed_weight = Column(Float, default=25.0)
+    reputation_weight = Column(Float, default=25.0)
+    
+    # Filters
+    max_price = Column(Float, nullable=True)
+    min_confidence = Column(Float, default=0.0)
+    max_latency = Column(Float, nullable=True)
+    min_reputation = Column(Float, default=0.0)
+    free_only = Column(Boolean, default=False)
+    
+    # Metadata
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    def __repr__(self):
+        return f"<UserPreference {self.user_id}>"
+
+
+class AgentMetric(Base):
+    """Agent performance metrics for trust score calculation"""
+    __tablename__ = "agent_metrics"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    agent_id = Column(String, ForeignKey("agents.id", ondelete="CASCADE"), nullable=False, index=True)
+    contract_id = Column(String, ForeignKey("contracts.id", ondelete="SET NULL"), nullable=True)
+    
+    # Performance data
+    execution_time = Column(Float, nullable=False)  # seconds
+    promised_time = Column(Float, nullable=False)  # seconds (from bid)
+    success = Column(Boolean, nullable=False)
+    user_rating = Column(Integer, nullable=True)  # 1-5 stars
+    
+    # Metadata
+    recorded_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    def __repr__(self):
+        return f"<AgentMetric {self.agent_id} - {'✅' if self.success else '❌'}>"
+
+
+class AgentTrustScore(Base):
+    """Calculated trust scores for agents (updated periodically)"""
+    __tablename__ = "agent_trust_scores"
+
+    agent_id = Column(String, ForeignKey("agents.id", ondelete="CASCADE"), primary_key=True)
+    
+    # Score components (0.0 - 1.0)
+    success_rate = Column(Float, default=0.0)
+    latency_score = Column(Float, default=0.0)  # How often meets promised time
+    rating_score = Column(Float, default=0.0)   # Average user rating normalized
+    uptime_score = Column(Float, default=0.0)   # Time on network
+    
+    # Overall trust score (weighted combination)
+    trust_score = Column(Float, default=0.5, index=True)
+    
+    # Statistics
+    total_contracts = Column(Integer, default=0)
+    successful_contracts = Column(Integer, default=0)
+    failed_contracts = Column(Integer, default=0)
+    average_execution_time = Column(Float, default=0.0)
+    total_earnings = Column(Float, default=0.0)
+    
+    # Metadata
+    last_calculated = Column(DateTime(timezone=True), server_default=func.now())
+    
+    def __repr__(self):
+        return f"<TrustScore {self.agent_id} - {self.trust_score:.2f}>"
+
+
+class MessageType(str, Enum):
+    """Agent-to-agent message types"""
+    QUERY = "query"
+    RESPONSE = "response"
+    NOTIFICATION = "notification"
+    PROPOSAL = "proposal"
+    ACCEPTANCE = "acceptance"
+    REJECTION = "rejection"
+    TERMINATION = "termination"
+
+
+class ConversationStatus(str, Enum):
+    """Conversation states"""
+    ACTIVE = "active"
+    AWAITING_RESPONSE = "awaiting_response"
+    RESOLVED = "resolved"
+    FAILED = "failed"
+    TERMINATED = "terminated"
+
+
+class A2AConversation(Base):
+    """Agent-to-agent conversations"""
+    __tablename__ = "a2a_conversations"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4())[:12])
+    
+    # Participants (agent IDs)
+    initiator_id = Column(String, ForeignKey("agents.id", ondelete="CASCADE"), nullable=False)
+    target_id = Column(String, ForeignKey("agents.id", ondelete="CASCADE"), nullable=False)
+    
+    # Conversation details
+    topic = Column(String, nullable=False)
+    status = Column(SQLEnum(ConversationStatus), default=ConversationStatus.ACTIVE, nullable=False)
+    context_data = Column(JSON, default=dict)  # Changed from 'metadata' to 'context_data'
+    
+    # Timing
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    resolved_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Relationships
+    messages = relationship("A2AMessage", back_populates="conversation", cascade="all, delete-orphan")
+    
+    def __repr__(self):
+        return f"<A2AConversation {self.id} - {self.topic}>"
+
+
+class A2AMessage(Base):
+    """Messages in agent-to-agent conversations"""
+    __tablename__ = "a2a_messages"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4())[:8])
+    conversation_id = Column(String, ForeignKey("a2a_conversations.id", ondelete="CASCADE"), nullable=False, index=True)
+    
+    # Message details
+    from_agent_id = Column(String, ForeignKey("agents.id", ondelete="CASCADE"), nullable=False)
+    to_agent_id = Column(String, ForeignKey("agents.id", ondelete="CASCADE"), nullable=False)
+    message_type = Column(SQLEnum(MessageType), nullable=False)
+    content = Column(JSON, nullable=False)
+    requires_response = Column(Boolean, default=False)
+    
+    # Metadata
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    conversation = relationship("A2AConversation", back_populates="messages")
+    
+    def __repr__(self):
+        return f"<A2AMessage {self.id} - {self.message_type.value}>"
+
     # Relationships
     agent = relationship("Agent", back_populates="ratings")
     user = relationship("User", back_populates="agent_ratings")

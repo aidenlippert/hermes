@@ -41,6 +41,10 @@ import {
   TrendingUp,
   Clock
 } from "lucide-react"
+import { useAuthStore } from "@/lib/store";
+import { useRouter } from "next/navigation";
+import withAuth from "@/components/withAuth";
+import { api, createWebSocket } from "@/lib/api";
 
 // Mock chat data
 interface Message {
@@ -49,6 +53,7 @@ interface Message {
   content: string
   timestamp: Date
   agents: any[]
+  error?: string
 }
 
 const mockMessages: Message[] = [
@@ -201,7 +206,7 @@ const suggestedPrompts = [
   }
 ]
 
-export default function ChatPage() {
+function ChatPage() {
   const [messages, setMessages] = useState<Message[]>(mockMessages)
   const [input, setInput] = useState("")
   const [isStreaming, setIsStreaming] = useState(false)
@@ -216,6 +221,12 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [mounted, setMounted] = useState(false)
+  const logout = useAuthStore((state) => state.logout);
+  const router = useRouter();
+  const accessToken = useAuthStore((state) => state.accessToken);
+  const user = useAuthStore((state) => state.user);
+  const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
+  const [wsConnection, setWsConnection] = useState<WebSocket | null>(null);
 
   useEffect(() => {
     setMounted(true)
@@ -224,6 +235,15 @@ export default function ChatPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages, streamingText])
+
+  useEffect(() => {
+    // Cleanup WebSocket on unmount
+    return () => {
+      if (wsConnection) {
+        wsConnection.close()
+      }
+    }
+  }, [wsConnection])
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -260,7 +280,7 @@ export default function ChatPage() {
   }
 
   const handleSend = async () => {
-    if (!input.trim() || isStreaming) return
+    if (!input.trim() || isStreaming || !accessToken) return
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -271,6 +291,7 @@ export default function ChatPage() {
     }
 
     setMessages(prev => [...prev, userMessage])
+    const query = input
     setInput("")
     setIsStreaming(true)
     setCurrentAgents([])
@@ -278,61 +299,118 @@ export default function ChatPage() {
     setExecutionSteps([])
     setAwaitingApproval(false)
 
-    // Simulate agent discovery
-    setTimeout(() => {
-      setDiscoveryPhase("Searching agent network...")
-    }, 1000)
+    try {
+      // Call the real backend API
+      const response = await api.chat.send({ query }, accessToken)
+      
+      setCurrentTaskId(response.task_id)
+      setDiscoveryPhase("Orchestrating agents...")
 
-    setTimeout(() => {
-      setDiscoveryPhase("Found 3 specialized agents!")
-      const selectedAgents = mockAgents.slice(0, Math.floor(Math.random() * 3) + 1)
-      setCurrentAgents(selectedAgents)
-      setAwaitingApproval(true)
-      setDiscoveryPhase(null)
-    }, 2500)
+      // Set up WebSocket connection for real-time updates
+      const ws = createWebSocket(response.task_id, accessToken)
+      setWsConnection(ws)
 
-    setTimeout(() => {
-      if (awaitingApproval) {
-        simulateTokenStreaming("I've found the perfect agents for your request. Click 'Approve & Execute' to proceed with the task execution.")
+      ws.onopen = () => {
+        console.log("WebSocket connected")
       }
-    }, 3000)
+
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data)
+        
+        if (data.type === "agents_discovered") {
+          setDiscoveryPhase(`Found ${data.agents.length} specialized agents!`)
+          setCurrentAgents(data.agents)
+        } else if (data.type === "execution_started") {
+          setDiscoveryPhase("Executing agents...")
+          setExecutionSteps(data.steps || [])
+        } else if (data.type === "step_update") {
+          setExecutionSteps(prev => 
+            prev.map((s, i) => 
+              i === data.step_index ? { ...s, status: data.status } : s
+            )
+          )
+        } else if (data.type === "streaming_token") {
+          setStreamingText(prev => prev + (data.token || ""))
+        } else if (data.type === "task_complete") {
+          setDiscoveryPhase(null)
+          setExecutionSteps([])
+          const assistantMessage: Message = {
+            id: Date.now().toString(),
+            role: "assistant",
+            content: data.result || response.message || "Task completed successfully!",
+            timestamp: new Date(),
+            agents: currentAgents
+          }
+          setMessages(prev => [...prev, assistantMessage])
+          setStreamingText("")
+          setIsStreaming(false)
+          setCurrentAgents([])
+          ws.close()
+        } else if (data.type === "error") {
+          setDiscoveryPhase(null)
+          setExecutionSteps([])
+          const errorMessage: Message = {
+            id: Date.now().toString(),
+            role: "assistant",
+            content: "An error occurred while processing your request.",
+            timestamp: new Date(),
+            agents: [],
+            error: data.error
+          }
+          setMessages(prev => [...prev, errorMessage])
+          setStreamingText("")
+          setIsStreaming(false)
+          setCurrentAgents([])
+          ws.close()
+        }
+      }
+
+      ws.onerror = (error) => {
+        console.error("WebSocket error:", error)
+        setDiscoveryPhase(null)
+        setExecutionSteps([])
+        const errorMessage: Message = {
+          id: Date.now().toString(),
+          role: "assistant",
+          content: response.message || "Task completed successfully!",
+          timestamp: new Date(),
+          agents: response.agents || []
+        }
+        setMessages(prev => [...prev, errorMessage])
+        setStreamingText("")
+        setIsStreaming(false)
+        setCurrentAgents([])
+      }
+
+      ws.onclose = () => {
+        console.log("WebSocket closed")
+        setWsConnection(null)
+      }
+
+    } catch (error: any) {
+      console.error("Chat error:", error)
+      setDiscoveryPhase(null)
+      setExecutionSteps([])
+      const errorMessage: Message = {
+        id: Date.now().toString(),
+        role: "assistant",
+        content: "Sorry, I encountered an error processing your request.",
+        timestamp: new Date(),
+        agents: [],
+        error: error.response?.data?.detail || error.message
+      }
+      setMessages(prev => [...prev, errorMessage])
+      setStreamingText("")
+      setIsStreaming(false)
+      setCurrentAgents([])
+    }
   }
 
   const handleApprove = () => {
+    // With real backend, approval is automatic
+    // This function is kept for UI compatibility but doesn't do anything
+    // The WebSocket will handle execution updates
     setAwaitingApproval(false)
-    setIsStreaming(true)
-    setDiscoveryPhase("Executing agents...")
-
-    const steps = currentAgents.map(agent => ({
-      agent: agent.name,
-      status: "pending"
-    }))
-    setExecutionSteps(steps)
-
-    // Simulate execution
-    steps.forEach((step, index) => {
-      setTimeout(() => {
-        setExecutionSteps(prev =>
-          prev.map((s, i) =>
-            i === index ? { ...s, status: "executing" } : s
-          )
-        )
-      }, 1000 * (index + 1))
-
-      setTimeout(() => {
-        setExecutionSteps(prev =>
-          prev.map((s, i) =>
-            i === index ? { ...s, status: "completed" } : s
-          )
-        )
-      }, 1000 * (index + 2))
-    })
-
-    setTimeout(() => {
-      setDiscoveryPhase(null)
-      setExecutionSteps([])
-      simulateTokenStreaming("Task completed successfully! The agents have finished processing your request. Here are the results...")
-    }, 1000 * (steps.length + 3))
   }
 
   const copyToClipboard = (text: string, id: string) => {
@@ -479,7 +557,10 @@ export default function ChatPage() {
                         Unlimited agents • Priority support
                       </div>
                     </div>
-                    <Button variant="ghost" size="icon">
+                    <Button variant="ghost" size="icon" onClick={() => {
+                      logout();
+                      router.push('/auth/login');
+                    }}>
                       <LogOut className="w-4 h-4" />
                     </Button>
                   </div>
@@ -817,7 +898,7 @@ export default function ChatPage() {
                             className="w-full"
                           >
                             <Sparkles className="w-5 h-5 mr-2" />
-                            Approve & Execute Agents
+                            Approve & Execute
                           </Button>
                         )}
                       </CardContent>
@@ -960,3 +1041,5 @@ export default function ChatPage() {
     </div>
   )
 }
+
+export default withAuth(ChatPage);

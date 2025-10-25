@@ -94,6 +94,19 @@ class AuthService:
             return None
 
     @staticmethod
+    def verify_refresh_token(token: str) -> Optional[str]:
+        """
+        Verify a refresh token and return the user's email.
+        """
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            if payload.get("type") != "refresh":
+                return None
+            return payload.get("sub")
+        except JWTError:
+            return None
+
+    @staticmethod
     async def register_user(
         db: AsyncSession,
         email: str,

@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono&family=Space+Grotesk:wght@400;500;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -14,6 +16,44 @@
 }
 
 @layer utilities {
+  /* Grid overlay used by hero */
+  .grid-overlay {
+    background-image:
+      linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  /* Hero radial + linear gradient background */
+  .hero-bg-gradient {
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -20%, rgba(234, 42, 51, 0.15), transparent),
+      linear-gradient(to bottom, rgba(18, 18, 18, 0) 0%, #121212 100%);
+  }
+
+  /* Grid background for sign-up and submission pages */
+  .grid-background {
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    background-size: 2rem 2rem;
+    background-position: center center;
+  }
+
+  /* Subtle grid for submission page */
+  .grid-background-submission {
+    background-image:
+      linear-gradient(rgba(51, 51, 51, 0.5) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(51, 51, 51, 0.5) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+
+  .dev-grid-background {
+    background-image:
+      repeating-linear-gradient(to right, #33333320, #33333320 1px, transparent 1px, transparent 40px),
+      repeating-linear-gradient(to bottom, #33333320, #33333320 1px, transparent 1px, transparent 40px);
+  }
+
   .animate-in {
     animation: fadeIn 0.3s ease-out;
   }
@@ -50,3 +90,17 @@
     }
   }
 }
+
+.code-highlight .token.punctuation { @apply text-[#89ddff]; }
+  .code-highlight .token.string { @apply text-[#c3e88d]; }
+  .code-highlight .token.keyword { @apply text-[#c792ea]; }
+  .code-highlight .token.number { @apply text-[#f78c6c]; }
+  .code-highlight .token.boolean { @apply text-[#ff5874]; }
+  .code-highlight .token.property { @apply text-[#82aaff]; }
+
+.canvas-bg {
+    background-image:
+        linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }

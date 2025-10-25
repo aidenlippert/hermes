@@ -13,6 +13,7 @@ from backend.database.connection import get_db
 from backend.services.auth import get_current_user
 from backend.database.models import User
 from backend.services.marketplace_service import MarketplaceService
+from backend.services.reputation import ReputationManager
 import logging
 
 logger = logging.getLogger(__name__)
@@ -298,3 +299,134 @@ async def get_marketplace_stats(db: AsyncSession = Depends(get_db)):
         "average_rating": round(avg_rating.scalar() or 0, 2),
         "categories": await MarketplaceService.get_categories(db)
     }
+
+
+# Trust & Reputation Endpoints
+
+@router.get("/agents/{agent_id}/trust-score")
+async def get_agent_trust_score(
+    agent_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get agent's current trust score.
+    
+    Returns a value from 0.0 to 1.0 representing trustworthiness.
+    Public endpoint.
+    """
+    
+    trust_score = await ReputationManager.get_trust_score(db, agent_id)
+    
+    return {
+        "agent_id": agent_id,
+        "trust_score": round(trust_score, 3),
+        "grade": _trust_grade(trust_score)
+    }
+
+
+@router.get("/agents/{agent_id}/reputation")
+async def get_agent_reputation(
+    agent_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get detailed reputation statistics for an agent.
+    
+    Includes:
+    - Trust score breakdown (success, latency, ratings, uptime, consistency)
+    - Performance badges
+    - Detailed statistics
+    
+    Public endpoint.
+    """
+    
+    stats = await ReputationManager.get_detailed_stats(db, agent_id)
+    
+    if not stats:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No reputation data found for agent {agent_id}"
+        )
+    
+    return stats
+
+
+@router.get("/leaderboard")
+async def get_leaderboard(
+    metric: str = Query("trust_score", description="Metric to rank by: trust_score, total_contracts, total_earnings"),
+    limit: int = Query(10, description="Number of results", le=50),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get agent leaderboard.
+    
+    Ranks agents by trust score, total contracts, or earnings.
+    Public endpoint.
+    """
+    
+    from sqlalchemy import select
+    from backend.database.models import AgentTrustScore, Agent
+    
+    # Build query
+    if metric == "trust_score":
+        order_by = AgentTrustScore.trust_score.desc()
+    elif metric == "total_contracts":
+        order_by = AgentTrustScore.total_contracts.desc()
+    elif metric == "total_earnings":
+        order_by = AgentTrustScore.total_earnings.desc()
+    else:
+        raise HTTPException(status_code=400, detail="Invalid metric")
+    
+    # Get top agents
+    query = (
+        select(AgentTrustScore, Agent)
+        .join(Agent, AgentTrustScore.agent_id == Agent.id)
+        .where(Agent.is_active == True)
+        .order_by(order_by)
+        .limit(limit)
+    )
+    
+    result = await db.execute(query)
+    rows = result.all()
+    
+    leaderboard = []
+    for score, agent in rows:
+        leaderboard.append({
+            "rank": len(leaderboard) + 1,
+            "agent_id": agent.id,
+            "agent_name": agent.name,
+            "trust_score": round(score.trust_score, 3),
+            "total_contracts": score.total_contracts,
+            "total_earnings": round(score.total_earnings, 2),
+            "success_rate": round(score.success_rate * 100, 1),
+            "grade": _trust_grade(score.trust_score)
+        })
+    
+    return {
+        "metric": metric,
+        "leaderboard": leaderboard
+    }
+
+
+def _trust_grade(score: float) -> str:
+    """Convert trust score to letter grade"""
+    if score >= 0.95:
+        return "A+"
+    elif score >= 0.90:
+        return "A"
+    elif score >= 0.85:
+        return "A-"
+    elif score >= 0.80:
+        return "B+"
+    elif score >= 0.75:
+        return "B"
+    elif score >= 0.70:
+        return "B-"
+    elif score >= 0.65:
+        return "C+"
+    elif score >= 0.60:
+        return "C"
+    elif score >= 0.55:
+        return "C-"
+    else:
+        return "D"
