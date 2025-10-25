@@ -67,8 +67,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include WebSocket router
+# Include routers
 app.include_router(v1_websocket.router, prefix="/api/v1", tags=["WebSocket"])
+
+# Include Marketplace router
+from backend.api import marketplace
+app.include_router(marketplace.router)
 
 # Security
 security = HTTPBearer()
