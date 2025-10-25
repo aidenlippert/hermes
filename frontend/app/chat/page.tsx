@@ -1,565 +1,839 @@
-"use client";
+"use client"
 
-import { useState, useEffect, useRef } from "react";
-import { Send, Loader2, Sparkles, User2, LogOut, Menu, Search, DollarSign, Star } from "lucide-react";
-import { useAuthStore, useChatStore } from "@/lib/store";
-import { api, createWebSocket } from "@/lib/api";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useRef } from "react"
+import { motion, AnimatePresence } from "framer-motion"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Send,
+  Loader2,
+  Sparkles,
+  User2,
+  LogOut,
+  Menu,
+  Search,
+  DollarSign,
+  Star,
+  Bot,
+  Zap,
+  Shield,
+  ChevronRight,
+  MessageSquare,
+  Plus,
+  Settings,
+  History,
+  Bookmark,
+  Share2,
+  Copy,
+  Check,
+  AlertCircle,
+  Activity,
+  Brain,
+  Globe,
+  Code,
+  FileText,
+  BarChart3,
+  Briefcase,
+  Palette,
+  Database,
+  Terminal,
+  Verified,
+  TrendingUp,
+  Clock
+} from "lucide-react"
+
+// Mock chat data
+const mockMessages = [
+  {
+    id: "1",
+    role: "assistant",
+    content: "Hello! I'm Hermes, your AI agent orchestrator. I can help you find and coordinate specialized AI agents for any task. What would you like to accomplish today?",
+    timestamp: new Date(Date.now() - 60000),
+    agents: []
+  }
+]
+
+const mockAgents = [
+  {
+    id: "flight-1",
+    name: "FlightFinder Pro",
+    description: "Searches flights across 200+ airlines with real-time pricing",
+    icon: Globe,
+    rating: 4.9,
+    calls: 45200,
+    verified: true,
+    skills: ["Flight Search", "Price Comparison", "Multi-city Routes"]
+  },
+  {
+    id: "hotel-1",
+    name: "HotelScout AI",
+    description: "Finds the best hotels with reviews and availability",
+    icon: Briefcase,
+    rating: 4.8,
+    calls: 38900,
+    verified: true,
+    skills: ["Hotel Search", "Review Analysis", "Price Tracking"]
+  },
+  {
+    id: "code-1",
+    name: "CodeAssist Ultra",
+    description: "Advanced code generation and debugging assistant",
+    icon: Code,
+    rating: 4.9,
+    calls: 128000,
+    verified: true,
+    skills: ["Code Generation", "Debugging", "Refactoring"]
+  }
+]
+
+const suggestedPrompts = [
+  {
+    icon: Globe,
+    text: "Find me flights from NYC to Paris next month",
+    category: "Travel"
+  },
+  {
+    icon: Code,
+    text: "Help me debug this React component",
+    category: "Development"
+  },
+  {
+    icon: BarChart3,
+    text: "Analyze this dataset and create visualizations",
+    category: "Analytics"
+  },
+  {
+    icon: FileText,
+    text: "Write a blog post about AI trends",
+    category: "Content"
+  }
+]
 
 export default function ChatPage() {
-  const router = useRouter();
-  const { token, user, logout } = useAuthStore();
-  const { messages, addMessage, addEvent, isStreaming, setStreaming } = useChatStore();
-
-  const [input, setInput] = useState("");
-  const [streamingText, setStreamingText] = useState("");
-  const [currentAgents, setCurrentAgents] = useState<any[]>([]);
-  const [discoveryPhase, setDiscoveryPhase] = useState<string | null>(null);
-  const [executionSteps, setExecutionSteps] = useState<any[]>([]);
-  const [awaitingApproval, setAwaitingApproval] = useState(false);
-  const [approvalData, setApprovalData] = useState<any>(null);
-  const [conversationId, setConversationId] = useState<string | null>(null);
-  const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [messages, setMessages] = useState(mockMessages)
+  const [input, setInput] = useState("")
+  const [isStreaming, setIsStreaming] = useState(false)
+  const [streamingText, setStreamingText] = useState("")
+  const [currentAgents, setCurrentAgents] = useState<any[]>([])
+  const [discoveryPhase, setDiscoveryPhase] = useState<string | null>(null)
+  const [executionSteps, setExecutionSteps] = useState<any[]>([])
+  const [awaitingApproval, setAwaitingApproval] = useState(false)
+  const [showSidebar, setShowSidebar] = useState(true)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    if (!token) {
-      router.push("/auth/login");
-    }
-  }, [token, router]);
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streamingText]);
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [messages, streamingText])
 
   useEffect(() => {
     if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-      textareaRef.current.style.height = textareaRef.current.scrollHeight + "px";
+      textareaRef.current.style.height = "auto"
+      textareaRef.current.style.height = textareaRef.current.scrollHeight + "px"
     }
-  }, [input]);
+  }, [input])
+
+  if (!mounted) return null
 
   const simulateTokenStreaming = (text: string) => {
-    setStreamingText("");
-    const words = text.split(" ");
-    let currentIndex = 0;
+    setStreamingText("")
+    const words = text.split(" ")
+    let currentIndex = 0
 
     const interval = setInterval(() => {
       if (currentIndex < words.length) {
-        setStreamingText((prev) => prev + (prev ? " " : "") + words[currentIndex]);
-        currentIndex++;
+        setStreamingText((prev) => prev + (prev ? " " : "") + words[currentIndex])
+        currentIndex++
       } else {
-        clearInterval(interval);
-        addMessage({
+        clearInterval(interval)
+        setMessages(prev => [...prev, {
           id: Date.now().toString(),
           role: "assistant",
           content: text,
           timestamp: new Date(),
-        });
-        setStreamingText("");
-        setStreaming(false);
+          agents: currentAgents
+        }])
+        setStreamingText("")
+        setIsStreaming(false)
+        setCurrentAgents([])
       }
-    }, 50);
-  };
-
-  const handleApprove = async () => {
-    if (!token || !approvalData || !currentTaskId || !conversationId) return;
-
-    setAwaitingApproval(false);
-    setStreaming(true);
-    setDiscoveryPhase("Executing agents...");
-
-    // Send approval message
-    const approvalMessage = {
-      id: Date.now().toString(),
-      role: "user" as const,
-      content: "Yes, proceed with these agents",
-      timestamp: new Date(),
-    };
-
-    addMessage(approvalMessage);
-
-    try {
-      // Call approval endpoint
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/v1/chat/approve`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          task_id: currentTaskId,
-          conversation_id: conversationId,
-          approved: true,
-          extracted_info: approvalData?.extracted_info
-        })
-      });
-
-      if (!response.ok) throw new Error("Approval failed");
-
-      // Connect to WebSocket for execution updates
-      const websocket = createWebSocket(currentTaskId, token);
-
-      websocket.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        addEvent(data);
-
-        if (data.type === "execution_started") {
-          setDiscoveryPhase("Agents working...");
-        } else if (data.type === "agent_progress") {
-          setDiscoveryPhase(data.message);
-        } else if (data.type === "agent_completed") {
-          setExecutionSteps(prev => [...prev, data]);
-        } else if (data.type === "execution_completed") {
-          setDiscoveryPhase(null);
-          setCurrentAgents([]);
-          setExecutionSteps([]);
-          simulateTokenStreaming(data.message);
-          websocket.close();
-        }
-      };
-
-      websocket.onerror = () => {
-        setStreaming(false);
-        setDiscoveryPhase(null);
-        websocket.close();
-      };
-    } catch (error) {
-      console.error("Approval error:", error);
-      setStreaming(false);
-      setDiscoveryPhase(null);
-    }
-  };
+    }, 50)
+  }
 
   const handleSend = async () => {
-    if (!input.trim() || !token || isStreaming) return;
+    if (!input.trim() || isStreaming) return
 
     const userMessage = {
       id: Date.now().toString(),
       role: "user" as const,
       content: input,
       timestamp: new Date(),
-    };
-
-    addMessage(userMessage);
-    setInput("");
-    setStreaming(true);
-    setCurrentAgents([]);
-    setDiscoveryPhase(null);
-    setExecutionSteps([]);
-    setAwaitingApproval(false);
-    setApprovalData(null);
-
-    try {
-      const response = await api.chat.send({
-        query: input,
-        conversation_id: conversationId || undefined
-      }, token);
-
-      // Save conversation ID and task ID for next operations
-      if (response.conversation_id) {
-        setConversationId(response.conversation_id);
-      }
-      if (response.task_id) {
-        setCurrentTaskId(response.task_id);
-      }
-
-      // Check if this is an awaiting_approval response
-      if (response.status === "awaiting_approval" && response.agents) {
-        // Use agent data from HTTP response directly (no WebSocket race condition)
-        setDiscoveryPhase(null);
-        setAwaitingApproval(true);
-        setApprovalData({
-          agents: response.agents,
-          extracted_info: response.extracted_info || {}
-        });
-        setCurrentAgents(response.agents);
-        if (response.result) {
-          simulateTokenStreaming(response.result);
-        }
-        return;
-      }
-
-      if (response.result) {
-        simulateTokenStreaming(response.result);
-        return;
-      }
-
-      const websocket = createWebSocket(response.task_id, token);
-
-      websocket.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        addEvent(data);
-
-        // Intent parsed
-        if (data.type === "intent_parsed") {
-          setDiscoveryPhase("Analyzing request...");
-        }
-
-        // Agents discovered
-        if (data.type === "agents_discovered") {
-          setDiscoveryPhase("Agents discovered!");
-          setCurrentAgents(data.agents || []);
-        }
-
-        // Follow-up questions
-        if (data.type === "follow_up_required") {
-          setDiscoveryPhase(null);
-          setCurrentAgents([]);
-          setAwaitingApproval(false);
-          simulateTokenStreaming(data.message);
-          websocket.close();
-          return;
-        }
-
-        // Awaiting approval
-        if (data.type === "awaiting_approval") {
-          setDiscoveryPhase(null);
-          setAwaitingApproval(true);
-          setApprovalData({
-            agents: data.agents,
-            extracted_info: data.extracted_info
-          });
-          setCurrentAgents(data.agents || []);
-          simulateTokenStreaming(data.message);
-          websocket.close();
-          return;
-        }
-
-        // Plan created
-        if (data.type === "plan_created") {
-          setDiscoveryPhase("Executing plan...");
-          setExecutionSteps(data.steps || []);
-        }
-
-        // Agent execution events
-        if (data.type === "agent_selected") {
-          setExecutionSteps(prev =>
-            prev.map(step =>
-              step.agent === data.agent_name
-                ? { ...step, status: "executing" }
-                : step
-            )
-          );
-        }
-
-        if (data.type === "agent_result") {
-          setExecutionSteps(prev =>
-            prev.map(step =>
-              step.agent === data.agent_name
-                ? { ...step, status: "completed", result: data.result }
-                : step
-            )
-          );
-        }
-
-        // Task completed
-        if (data.type === "task_completed") {
-          setDiscoveryPhase(null);
-          setCurrentAgents([]);
-          setExecutionSteps([]);
-          const result = data.final_output || response.result;
-          if (result) {
-            simulateTokenStreaming(result);
-          }
-          websocket.close();
-        } else if (data.type === "task_failed") {
-          setDiscoveryPhase(null);
-          setCurrentAgents([]);
-          setExecutionSteps([]);
-          addMessage({
-            id: Date.now().toString(),
-            role: "assistant",
-            content: "Sorry, the task failed. Please try again.",
-            timestamp: new Date(),
-          });
-          setStreaming(false);
-          websocket.close();
-        }
-      };
-
-      websocket.onerror = () => {
-        setStreaming(false);
-        websocket.close();
-      };
-    } catch (error) {
-      console.error("Chat error:", error);
-      setStreaming(false);
+      agents: []
     }
-  };
+
+    setMessages(prev => [...prev, userMessage])
+    setInput("")
+    setIsStreaming(true)
+    setCurrentAgents([])
+    setDiscoveryPhase("Analyzing your request...")
+    setExecutionSteps([])
+    setAwaitingApproval(false)
+
+    // Simulate agent discovery
+    setTimeout(() => {
+      setDiscoveryPhase("Searching agent network...")
+    }, 1000)
+
+    setTimeout(() => {
+      setDiscoveryPhase("Found 3 specialized agents!")
+      const selectedAgents = mockAgents.slice(0, Math.floor(Math.random() * 3) + 1)
+      setCurrentAgents(selectedAgents)
+      setAwaitingApproval(true)
+      setDiscoveryPhase(null)
+    }, 2500)
+
+    setTimeout(() => {
+      if (awaitingApproval) {
+        simulateTokenStreaming("I've found the perfect agents for your request. Click 'Approve & Execute' to proceed with the task execution.")
+      }
+    }, 3000)
+  }
+
+  const handleApprove = () => {
+    setAwaitingApproval(false)
+    setIsStreaming(true)
+    setDiscoveryPhase("Executing agents...")
+
+    const steps = currentAgents.map(agent => ({
+      agent: agent.name,
+      status: "pending"
+    }))
+    setExecutionSteps(steps)
+
+    // Simulate execution
+    steps.forEach((step, index) => {
+      setTimeout(() => {
+        setExecutionSteps(prev =>
+          prev.map((s, i) =>
+            i === index ? { ...s, status: "executing" } : s
+          )
+        )
+      }, 1000 * (index + 1))
+
+      setTimeout(() => {
+        setExecutionSteps(prev =>
+          prev.map((s, i) =>
+            i === index ? { ...s, status: "completed" } : s
+          )
+        )
+      }, 1000 * (index + 2))
+    })
+
+    setTimeout(() => {
+      setDiscoveryPhase(null)
+      setExecutionSteps([])
+      simulateTokenStreaming("Task completed successfully! The agents have finished processing your request. Here are the results...")
+    }, 1000 * (steps.length + 3))
+  }
+
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text)
+    setCopiedId(id)
+    setTimeout(() => setCopiedId(null), 2000)
+  }
+
+  const handlePromptClick = (prompt: string) => {
+    setInput(prompt)
+    textareaRef.current?.focus()
+  }
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen bg-gradient-to-b from-gray-50 to-white dark:from-gray-950 dark:to-gray-900">
       {/* Sidebar */}
-      <div className="hidden md:flex w-64 flex-col border-r border-border bg-muted/30">
-        <div className="p-4 border-b border-border">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-primary" />
-            <span className="font-semibold text-lg">Hermes</span>
-          </div>
-        </div>
-
-        <div className="flex-1 p-4">
-          <button
-            onClick={() => {
-              setConversationId(null);
-              useChatStore.setState({ messages: [] });
-            }}
-            className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
+      <AnimatePresence mode="wait">
+        {showSidebar && (
+          <motion.div
+            initial={{ x: -300 }}
+            animate={{ x: 0 }}
+            exit={{ x: -300 }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            className="w-80 flex flex-col border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950"
           >
-            New Chat
-          </button>
-        </div>
-
-        <div className="p-4 border-t border-border">
-          <div className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-secondary transition-colors cursor-pointer">
-            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-              <User2 className="w-4 h-4 text-primary" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium truncate">{user?.username || "User"}</div>
-              <div className="text-xs text-muted-foreground">Free Plan</div>
-            </div>
-            <button
-              onClick={logout}
-              className="p-1 hover:bg-secondary rounded"
-            >
-              <LogOut className="w-4 h-4 text-muted-foreground" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Chat */}
-      <div className="flex-1 flex flex-col">
-        {/* Mobile Header */}
-        <div className="md:hidden flex items-center justify-between p-4 border-b border-border">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-primary" />
-            <span className="font-semibold">Hermes</span>
-          </div>
-          <button className="p-2 hover:bg-secondary rounded-lg transition-colors">
-            <Menu className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex gap-4 animate-in ${
-                  message.role === "user" ? "justify-end" : ""
-                }`}
-              >
-                {message.role === "assistant" && (
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center flex-shrink-0">
-                    <Sparkles className="w-4 h-4 text-white" />
+            {/* Sidebar Header */}
+            <div className="p-6 border-b border-gray-200 dark:border-gray-800">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center">
+                    <Sparkles className="w-6 h-6 text-white" />
                   </div>
-                )}
-                <div className={`flex flex-col gap-2 max-w-2xl ${message.role === "user" ? "items-end" : ""}`}>
-                  <div
-                    className={`rounded-2xl px-4 py-3 ${
-                      message.role === "user"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted text-foreground"
+                  <div>
+                    <h2 className="font-bold text-lg">Hermes AI</h2>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Agent Orchestrator</p>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowSidebar(false)}
+                >
+                  <Menu className="w-5 h-5" />
+                </Button>
+              </div>
+
+              <Button className="w-full" size="lg">
+                <Plus className="w-5 h-5 mr-2" />
+                New Chat
+              </Button>
+            </div>
+
+            {/* Chat History */}
+            <div className="flex-1 overflow-y-auto p-4">
+              <div className="space-y-2">
+                <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-2 mb-3">
+                  Recent Chats
+                </h3>
+                {["Travel Planning Assistant", "Code Review Session", "Data Analysis Project", "Content Creation", "Market Research"].map((chat, index) => (
+                  <button
+                    key={index}
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors group"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <MessageSquare className="w-4 h-4 text-gray-400" />
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          {chat}
+                        </span>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 ml-6 mt-1">
+                      {index === 0 ? "2 hours ago" : index === 1 ? "Yesterday" : `${index + 1} days ago`}
+                    </p>
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-6 space-y-2">
+                <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-2 mb-3">
+                  Quick Actions
+                </h3>
+                <button className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex items-center gap-2">
+                  <Bookmark className="w-4 h-4 text-gray-400" />
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Saved Prompts
+                  </span>
+                </button>
+                <button className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex items-center gap-2">
+                  <History className="w-4 h-4 text-gray-400" />
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Chat History
+                  </span>
+                </button>
+                <button className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex items-center gap-2">
+                  <Settings className="w-4 h-4 text-gray-400" />
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Settings
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* User Profile */}
+            <div className="p-4 border-t border-gray-200 dark:border-gray-800">
+              <Card className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 border-0">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center">
+                      <User2 className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-medium text-sm">Premium User</div>
+                      <div className="text-xs text-gray-600 dark:text-gray-400">
+                        Unlimited agents • Priority support
+                      </div>
+                    </div>
+                    <Button variant="ghost" size="icon">
+                      <LogOut className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <div className="mt-4 space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-gray-600 dark:text-gray-400">Usage today</span>
+                      <span className="font-medium">24 / ∞</span>
+                    </div>
+                    <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-1.5">
+                      <div className="bg-gradient-to-r from-blue-500 to-purple-500 h-1.5 rounded-full" style={{ width: "24%" }} />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col">
+        {/* Chat Header */}
+        <div className="bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              {!showSidebar && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowSidebar(true)}
+                >
+                  <Menu className="w-5 h-5" />
+                </Button>
+              )}
+              <div>
+                <h1 className="text-lg font-semibold">Agent Chat</h1>
+                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                  <Activity className="w-3 h-3 text-green-500" />
+                  <span>All systems operational</span>
+                  <span className="text-gray-400">•</span>
+                  <span>45ms avg response</span>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="icon">
+                <Share2 className="w-5 h-5" />
+              </Button>
+              <Button variant="ghost" size="icon">
+                <Settings className="w-5 h-5" />
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Messages Area */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-4xl mx-auto px-6 py-8">
+            {/* Welcome Message for Empty State */}
+            {messages.length === 1 && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-8"
+              >
+                <Card className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 border-blue-200 dark:border-blue-800">
+                  <CardHeader>
+                    <CardTitle className="text-2xl">Welcome to Hermes AI! 🚀</CardTitle>
+                    <CardDescription className="text-base">
+                      Your intelligent agent orchestrator that connects you with specialized AI agents
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                          <Bot className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">2,341 Agents</p>
+                          <p className="text-xs text-gray-600 dark:text-gray-400">Ready to help</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                          <Zap className="w-5 h-5 text-green-600 dark:text-green-400" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">45ms Response</p>
+                          <p className="text-xs text-gray-600 dark:text-gray-400">Lightning fast</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                          <Shield className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">Enterprise Ready</p>
+                          <p className="text-xs text-gray-600 dark:text-gray-400">SOC2 compliant</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                        Try these popular requests:
+                      </p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {suggestedPrompts.map((prompt, index) => (
+                          <button
+                            key={index}
+                            onClick={() => handlePromptClick(prompt.text)}
+                            className="text-left p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group"
+                          >
+                            <div className="flex items-center gap-3">
+                              <prompt.icon className="w-5 h-5 text-gray-400 group-hover:text-blue-500 transition-colors" />
+                              <div className="flex-1">
+                                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                  {prompt.text}
+                                </p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                  {prompt.category}
+                                </p>
+                              </div>
+                              <ChevronRight className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
+
+            {/* Message Thread */}
+            <div className="space-y-6">
+              <AnimatePresence mode="popLayout">
+                {messages.map((message) => (
+                  <motion.div
+                    key={message.id}
+                    layout
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    className={`flex gap-4 ${
+                      message.role === "user" ? "justify-end" : ""
                     }`}
                   >
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                      {message.content}
-                    </p>
-                  </div>
-                </div>
-                {message.role === "user" && (
-                  <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center flex-shrink-0">
-                    <User2 className="w-4 h-4 text-muted-foreground" />
-                  </div>
-                )}
-              </div>
-            ))}
-
-            {/* Streaming Response */}
-            {streamingText && (
-              <div className="flex gap-4 animate-in">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center flex-shrink-0">
-                  <Sparkles className="w-4 h-4 text-white" />
-                </div>
-                <div className="flex flex-col gap-2 max-w-2xl">
-                  <div className="rounded-2xl px-4 py-3 bg-muted text-foreground">
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                      {streamingText}
-                      <span className="inline-block w-0.5 h-4 bg-primary ml-1 animate-pulse" />
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Thinking State */}
-            {isStreaming && !streamingText && (
-              <div className="flex gap-4 animate-in">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center flex-shrink-0">
-                  <Sparkles className="w-4 h-4 text-white" />
-                </div>
-                <div className="rounded-2xl px-4 py-3 bg-muted">
-                  <div className="flex gap-1">
-                    <div className="w-2 h-2 rounded-full bg-muted-foreground thinking-dot" />
-                    <div className="w-2 h-2 rounded-full bg-muted-foreground thinking-dot" />
-                    <div className="w-2 h-2 rounded-full bg-muted-foreground thinking-dot" />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Discovery Phase */}
-            {discoveryPhase && (
-              <div className="flex gap-4 animate-in">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center flex-shrink-0">
-                  <Search className="w-4 h-4 text-white" />
-                </div>
-                <div className="rounded-2xl px-4 py-3 bg-muted text-foreground">
-                  <p className="text-sm font-medium">{discoveryPhase}</p>
-                </div>
-              </div>
-            )}
-
-            {/* Agent Discovery Cards */}
-            {currentAgents.length > 0 && (
-              <div className="flex gap-4 animate-in">
-                <div className="w-8 h-8" />
-                <div className="w-full max-w-2xl">
-                  <p className="text-sm font-medium text-muted-foreground mb-3">
-                    🔍 Found {currentAgents.length} specialized agents:
-                  </p>
-                  <div className="grid grid-cols-1 gap-3 mb-4">
-                    {currentAgents.map((agent, i) => (
-                      <div
-                        key={i}
-                        className="p-4 bg-background border border-border rounded-xl hover:border-primary/50 transition-all cursor-pointer group"
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <Sparkles className="w-4 h-4 text-primary" />
-                              <h4 className="font-semibold text-sm">{agent.name}</h4>
-                            </div>
-                            <p className="text-xs text-muted-foreground mb-2">
-                              {agent.description || agent.capabilities?.join(", ") || "No capabilities listed"}
-                            </p>
-                            {/* Coming soon - price and rating */}
-                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                              <div className="flex items-center gap-1">
-                                <DollarSign className="w-3 h-3" />
-                                <span>Coming Soon</span>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <Star className="w-3 h-3" />
-                                <span>Coming Soon</span>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="text-xs text-primary group-hover:underline">
-                            View Similar
-                          </div>
-                        </div>
+                    {message.role === "assistant" && (
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center flex-shrink-0">
+                        <Sparkles className="w-5 h-5 text-white" />
                       </div>
-                    ))}
-                  </div>
-
-                  {/* Approval Button */}
-                  {awaitingApproval && (
-                    <button
-                      onClick={handleApprove}
-                      className="w-full px-6 py-3 bg-primary text-primary-foreground rounded-xl font-medium hover:bg-primary/90 transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-2"
-                    >
-                      <Sparkles className="w-5 h-5" />
-                      Approve & Execute
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Execution Steps */}
-            {executionSteps.length > 0 && (
-              <div className="flex gap-4 animate-in">
-                <div className="w-8 h-8" />
-                <div className="w-full max-w-2xl">
-                  <p className="text-sm font-medium text-muted-foreground mb-3">
-                    ⚡ Execution Progress:
-                  </p>
-                  <div className="space-y-2">
-                    {executionSteps.map((step, i) => (
+                    )}
+                    <div className={`flex-1 max-w-2xl ${message.role === "user" ? "flex flex-col items-end" : ""}`}>
                       <div
-                        key={i}
-                        className={`p-3 rounded-lg border ${
-                          step.status === "completed"
-                            ? "bg-primary/5 border-primary/30"
-                            : step.status === "executing"
-                            ? "bg-accent border-accent-foreground/30"
-                            : "bg-muted border-border"
+                        className={`rounded-2xl px-5 py-4 ${
+                          message.role === "user"
+                            ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white"
+                            : "bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800"
                         }`}
                       >
-                        <div className="flex items-center gap-2 text-sm">
-                          {step.status === "completed" ? (
-                            <span className="text-primary">✓</span>
-                          ) : step.status === "executing" ? (
-                            <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                          ) : (
-                            <span className="text-muted-foreground">○</span>
-                          )}
-                          <span className="font-medium">{step.agent || step.description}</span>
-                        </div>
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                          {message.content}
+                        </p>
+                        {message.agents && message.agents.length > 0 && (
+                          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                            <p className="text-xs font-medium mb-2 opacity-80">
+                              Agents used:
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {message.agents.map((agent: any) => (
+                                <span
+                                  key={agent.id}
+                                  className="px-2 py-1 bg-white/20 dark:bg-gray-800 rounded-full text-xs"
+                                >
+                                  {agent.name}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    ))}
+                      <div className="flex items-center gap-3 mt-2 px-2">
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {new Date(message.timestamp).toLocaleTimeString()}
+                        </span>
+                        {message.role === "assistant" && (
+                          <>
+                            <button
+                              onClick={() => copyToClipboard(message.content, message.id)}
+                              className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
+                            >
+                              {copiedId === message.id ? (
+                                <Check className="w-3 h-3 text-green-500" />
+                              ) : (
+                                <Copy className="w-3 h-3 text-gray-400" />
+                              )}
+                            </button>
+                            <button className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors">
+                              <Share2 className="w-3 h-3 text-gray-400" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    {message.role === "user" && (
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-gray-700 to-gray-800 flex items-center justify-center flex-shrink-0">
+                        <User2 className="w-5 h-5 text-white" />
+                      </div>
+                    )}
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+
+              {/* Streaming Response */}
+              {streamingText && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex gap-4"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center flex-shrink-0">
+                    <Sparkles className="w-5 h-5 text-white" />
                   </div>
-                </div>
-              </div>
-            )}
+                  <div className="flex-1 max-w-2xl">
+                    <div className="rounded-2xl px-5 py-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                        {streamingText}
+                        <span className="inline-block w-1 h-4 bg-blue-500 ml-1 animate-pulse" />
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Discovery Phase */}
+              {discoveryPhase && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="flex gap-4"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 flex items-center justify-center flex-shrink-0 animate-pulse">
+                    <Brain className="w-5 h-5 text-white" />
+                  </div>
+                  <Card className="flex-1 max-w-2xl border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/20">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <Loader2 className="w-5 h-5 text-orange-600 dark:text-orange-400 animate-spin" />
+                        <p className="text-sm font-medium text-orange-900 dark:text-orange-100">
+                          {discoveryPhase}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
+
+              {/* Agent Discovery Cards */}
+              {currentAgents.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex gap-4"
+                >
+                  <div className="w-10 h-10" />
+                  <div className="flex-1 max-w-2xl">
+                    <Card className="border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/20">
+                      <CardHeader>
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          <Search className="w-5 h-5" />
+                          Found {currentAgents.length} Specialized Agents
+                        </CardTitle>
+                        <CardDescription>
+                          Review the selected agents for your task
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        {currentAgents.map((agent) => {
+                          const Icon = agent.icon
+                          return (
+                            <motion.div
+                              key={agent.id}
+                              initial={{ opacity: 0, x: -20 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              className="p-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-blue-500 transition-colors group cursor-pointer"
+                            >
+                              <div className="flex items-start gap-4">
+                                <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+                                  <Icon className="w-6 h-6 text-white" />
+                                </div>
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <h4 className="font-semibold text-sm">{agent.name}</h4>
+                                    {agent.verified && (
+                                      <Verified className="w-4 h-4 text-blue-500" />
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                                    {agent.description}
+                                  </p>
+                                  <div className="flex items-center gap-4 text-xs">
+                                    <div className="flex items-center gap-1">
+                                      <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
+                                      <span className="font-medium">{agent.rating}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      <Zap className="w-3 h-3 text-gray-400" />
+                                      <span>{(agent.calls / 1000).toFixed(0)}K calls</span>
+                                    </div>
+                                  </div>
+                                  <div className="flex flex-wrap gap-1 mt-2">
+                                    {agent.skills.map((skill: string) => (
+                                      <span
+                                        key={skill}
+                                        className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs rounded-full"
+                                      >
+                                        {skill}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            </motion.div>
+                          )
+                        })}
+
+                        {/* Approval Button */}
+                        {awaitingApproval && (
+                          <Button
+                            onClick={handleApprove}
+                            size="lg"
+                            className="w-full"
+                          >
+                            <Sparkles className="w-5 h-5 mr-2" />
+                            Approve & Execute Agents
+                          </Button>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Execution Steps */}
+              {executionSteps.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex gap-4"
+                >
+                  <div className="w-10 h-10" />
+                  <Card className="flex-1 max-w-2xl">
+                    <CardHeader>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Terminal className="w-5 h-5" />
+                        Execution Progress
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {executionSteps.map((step, index) => (
+                          <motion.div
+                            key={index}
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: index * 0.1 }}
+                            className={`p-3 rounded-lg border ${
+                              step.status === "completed"
+                                ? "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800"
+                                : step.status === "executing"
+                                ? "bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800"
+                                : "bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800"
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              {step.status === "completed" ? (
+                                <Check className="w-5 h-5 text-green-600 dark:text-green-400" />
+                              ) : step.status === "executing" ? (
+                                <Loader2 className="w-5 h-5 text-blue-600 dark:text-blue-400 animate-spin" />
+                              ) : (
+                                <Clock className="w-5 h-5 text-gray-400" />
+                              )}
+                              <span className="text-sm font-medium">{step.agent}</span>
+                            </div>
+                          </motion.div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
+
+              {/* Thinking Animation */}
+              {isStreaming && !streamingText && !discoveryPhase && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex gap-4"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center flex-shrink-0">
+                    <Sparkles className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="flex-1 max-w-2xl">
+                    <div className="rounded-2xl px-5 py-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
+                      <div className="flex gap-2">
+                        <div className="w-2 h-2 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: "0ms" }} />
+                        <div className="w-2 h-2 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: "150ms" }} />
+                        <div className="w-2 h-2 rounded-full bg-pink-500 animate-bounce" style={{ animationDelay: "300ms" }} />
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </div>
 
             <div ref={messagesEndRef} />
           </div>
         </div>
 
         {/* Input Area */}
-        <div className="border-t border-border bg-background">
-          <div className="max-w-3xl mx-auto px-4 py-4">
-            <div className="relative flex items-end gap-2 bg-muted rounded-2xl p-2">
-              <textarea
-                ref={textareaRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSend();
-                  }
-                }}
-                placeholder="Message Hermes..."
-                disabled={isStreaming}
-                rows={1}
-                className="flex-1 bg-transparent border-none outline-none resize-none px-3 py-2 text-sm placeholder:text-muted-foreground disabled:opacity-50 max-h-32"
-              />
-              <button
+        <div className="bg-white dark:bg-gray-950 border-t border-gray-200 dark:border-gray-800">
+          <div className="max-w-4xl mx-auto px-6 py-4">
+            <div className="flex items-end gap-4">
+              <div className="flex-1 relative">
+                <textarea
+                  ref={textareaRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault()
+                      handleSend()
+                    }
+                  }}
+                  placeholder="Ask Hermes to find agents for any task..."
+                  disabled={isStreaming}
+                  rows={1}
+                  className="w-full px-5 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-500 disabled:opacity-50 max-h-32 text-sm"
+                />
+              </div>
+              <Button
                 onClick={handleSend}
                 disabled={isStreaming || !input.trim()}
-                className="p-2 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all disabled:hover:bg-primary flex-shrink-0"
+                size="lg"
+                className="rounded-2xl px-6"
               >
                 {isStreaming ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
                 ) : (
-                  <Send className="w-5 h-5" />
+                  <>
+                    <Send className="w-5 h-5 mr-2" />
+                    Send
+                  </>
                 )}
-              </button>
+              </Button>
             </div>
-            <p className="text-xs text-muted-foreground text-center mt-3">
-              Hermes can make mistakes. Check important info.
-            </p>
+            <div className="flex items-center justify-between mt-3">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Press Enter to send, Shift+Enter for new line
+              </p>
+              <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+                <span className="flex items-center gap-1">
+                  <Shield className="w-3 h-3" />
+                  End-to-end encrypted
+                </span>
+                <span className="flex items-center gap-1">
+                  <Zap className="w-3 h-3" />
+                  Powered by A2A Protocol
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </div>
-  );
+  )
 }
