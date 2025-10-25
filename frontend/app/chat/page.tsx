@@ -43,7 +43,15 @@ import {
 } from "lucide-react"
 
 // Mock chat data
-const mockMessages = [
+interface Message {
+  id: string
+  role: "user" | "assistant"
+  content: string
+  timestamp: Date
+  agents: any[]
+}
+
+const mockMessages: Message[] = [
   {
     id: "1",
     role: "assistant",
@@ -110,7 +118,7 @@ const suggestedPrompts = [
 ]
 
 export default function ChatPage() {
-  const [messages, setMessages] = useState(mockMessages)
+  const [messages, setMessages] = useState<Message[]>(mockMessages)
   const [input, setInput] = useState("")
   const [isStreaming, setIsStreaming] = useState(false)
   const [streamingText, setStreamingText] = useState("")
@@ -169,9 +177,9 @@ export default function ChatPage() {
   const handleSend = async () => {
     if (!input.trim() || isStreaming) return
 
-    const userMessage = {
+    const userMessage: Message = {
       id: Date.now().toString(),
-      role: "user" as const,
+      role: "user",
       content: input,
       timestamp: new Date(),
       agents: []
