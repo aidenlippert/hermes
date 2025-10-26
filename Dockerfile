@@ -25,5 +25,5 @@ RUN chmod +x start.sh
 # Expose port
 EXPOSE 8000
 
-# Start the application
-CMD ["./start.sh"]
+# Start the application using bash explicitly
+CMD ["/bin/bash", "./start.sh"]
