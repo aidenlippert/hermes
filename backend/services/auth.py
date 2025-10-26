@@ -10,10 +10,13 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import HTTPException, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import os
 import secrets
 
 from backend.database.models import User, APIKey, UserRole, SubscriptionTier
+from backend.database.connection import get_db
 
 # Configuration
 SECRET_KEY = os.getenv("SECRET_KEY", secrets.token_urlsafe(32))
@@ -304,3 +307,54 @@ class AuthService:
             return True
 
         return user.requests_this_month < limit
+
+
+# FastAPI dependency for getting current user from JWT token
+security = HTTPBearer()
+
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: AsyncSession = Depends(get_db)
+) -> User:
+    """
+    FastAPI dependency to get the current authenticated user from JWT token.
+
+    Args:
+        credentials: HTTP Bearer token from request header
+        db: Database session
+
+    Returns:
+        User object if token is valid
+
+    Raises:
+        HTTPException: If token is invalid or user not found
+    """
+    token = credentials.credentials
+
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = payload.get("sub")
+
+        if not user_id:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid authentication credentials"
+            )
+
+        # Get user from database
+        user = await AuthService.get_user_by_id(db, user_id)
+
+        if not user:
+            raise HTTPException(
+                status_code=404,
+                detail="User not found"
+            )
+
+        return user
+
+    except JWTError:
+        raise HTTPException(
+            status_code=401,
+            detail="Could not validate credentials"
+        )
