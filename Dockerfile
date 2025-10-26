@@ -18,5 +18,9 @@ COPY . .
 # Make migration script executable
 RUN chmod +x railway_migrate.sh
 
+# Expose port
+EXPOSE 8000
+
 # Run migrations and start server
-CMD bash railway_migrate.sh && uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+# Use shell form to allow environment variable expansion
+CMD bash railway_migrate.sh && uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000}
