@@ -30,6 +30,7 @@ from hermes.conductor.executor import Executor
 
 from backend.api import v1_auth
 from backend.api import v1_websocket
+from backend.api import marketplace
 from backend.websocket.manager import manager
 from backend.mesh.network import MeshNetwork, FlightAgent, HotelAgent
 
@@ -1105,6 +1106,9 @@ async def send_a2a_message(conversation_id: str, data: Dict[str, Any]):
 
 # Include authentication router
 app.include_router(v1_auth.router, prefix="/api/v1/auth", tags=["Authentication"])
+
+# Include marketplace router (Sprint 1.2)
+app.include_router(marketplace.router, tags=["Marketplace"])
 
 # Include WebSocket router
 app.include_router(v1_websocket.router, prefix="/api/v1", tags=["WebSocket"])
