@@ -1,9 +1,8 @@
+# Let Nixpacks auto-detect Python from runtime.txt
 [phases.setup]
-nixPkgs = ["python310Full", "postgresql"]
-nixLibs = ["stdenv.cc.cc"]
+nixPkgs = ["postgresql"]
 
 [phases.install]
-cmds = ["pip install --upgrade pip setuptools wheel", "pip install -r requirements.txt"]
 
 [phases.build]
 cmds = ["chmod +x railway_migrate.sh"]
