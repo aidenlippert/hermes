@@ -16,12 +16,11 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy application code
 COPY . .
 
-# Make migration script executable
-RUN chmod +x railway_migrate.sh
+# Make start script executable
+RUN chmod +x start.sh
 
 # Expose port
 EXPOSE 8000
 
-# Run migrations and start server
-# Use shell form to allow environment variable expansion
-CMD bash railway_migrate.sh && uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000}
+# Start the application
+CMD ["./start.sh"]
