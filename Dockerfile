@@ -1,5 +1,8 @@
 FROM python:3.10-slim
 
+# Bust Railway's cache - v2
+ENV RAILWAY_CACHE_BUST=v2
+
 # Force rebuild - updated 2025-10-25
 WORKDIR /app
 
