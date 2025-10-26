@@ -25,5 +25,5 @@ RUN chmod +x start.sh
 # Expose port
 EXPOSE 8000
 
-# Start the application using bash explicitly
-CMD ["/bin/bash", "./start.sh"]
+# Start the application - inline everything to avoid Railway cache bugs
+CMD ["/bin/bash", "-c", "echo '🚀 Starting Hermes' && echo 'PORT='${PORT} && alembic upgrade head && uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
