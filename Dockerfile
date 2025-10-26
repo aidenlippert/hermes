@@ -1,5 +1,6 @@
 FROM python:3.10-slim
 
+# Force rebuild - updated 2025-10-25
 WORKDIR /app
 
 # Install PostgreSQL client
