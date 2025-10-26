@@ -198,6 +198,13 @@ class AgentRating(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
+    # Relationships
+    agent = relationship("Agent", back_populates="ratings")
+    user = relationship("User", back_populates="agent_ratings")
+
+    def __repr__(self):
+        return f"<AgentRating {self.agent_id} - {self.rating}★>"
+
 
 # ============================================================
 # MESH PROTOCOL MODELS
@@ -442,13 +449,6 @@ class A2AMessage(Base):
     
     def __repr__(self):
         return f"<A2AMessage {self.id} - {self.message_type.value}>"
-
-    # Relationships
-    agent = relationship("Agent", back_populates="ratings")
-    user = relationship("User", back_populates="agent_ratings")
-
-    def __repr__(self):
-        return f"<AgentRating {self.agent_id} - {self.rating}★>"
 
 
 class Conversation(Base):

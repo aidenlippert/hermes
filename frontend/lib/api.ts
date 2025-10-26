@@ -80,6 +80,19 @@ export const api = {
       );
       return response.data;
     },
+
+    async history(token: string) {
+      try {
+        const response = await axios.get(
+          `${API_URL}/api/v1/conversations`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        return response.data;
+      } catch (error) {
+        console.error("Failed to load chat history:", error);
+        return { conversations: [] };
+      }
+    },
   },
 
   agents: {

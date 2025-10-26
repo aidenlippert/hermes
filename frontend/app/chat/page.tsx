@@ -46,7 +46,7 @@ import { useRouter } from "next/navigation";
 import withAuth from "@/components/withAuth";
 import { api, createWebSocket } from "@/lib/api";
 
-// Mock chat data
+// Chat interfaces
 interface Message {
   id: string
   role: "user" | "assistant"
@@ -56,131 +56,20 @@ interface Message {
   error?: string
 }
 
-const mockMessages: Message[] = [
-  {
-    id: "1",
-    role: "assistant",
-    content: "Hello! I'm Hermes, your AI agent orchestrator. I can help you find and coordinate specialized AI agents for any task. What would you like to accomplish today?",
-    timestamp: new Date(Date.now() - 60000),
-    agents: []
-  }
-]
+interface ChatHistory {
+  id: string
+  title: string
+  lastMessage: string
+  timestamp: Date
+  messages: Message[]
+}
 
-const mockAgents = [
-  {
-    id: "flight-1",
-    name: "FlightFinder Pro",
-    description: "Searches flights across 200+ airlines with real-time pricing",
-    icon: Globe,
-    rating: 4.9,
-    calls: 45200,
-    verified: true,
-    skills: ["Flight Search", "Price Comparison", "Multi-city Routes"]
-  },
-  {
-    id: "hotel-1",
-    name: "HotelScout AI",
-    description: "Finds the best hotels with reviews and availability",
-    icon: Briefcase,
-    rating: 4.8,
-    calls: 38900,
-    verified: true,
-    skills: ["Hotel Search", "Review Analysis", "Price Tracking"]
-  },
-  {
-    id: "code-1",
-    name: "CodeAssist Ultra",
-    description: "Advanced code generation and debugging assistant",
-    icon: Code,
-    rating: 4.9,
-    calls: 128000,
-    verified: true,
-    skills: ["Code Generation", "Debugging", "Refactoring"]
-  }
-]
-
-// Mock conversation histories
-const chatHistories: Record<string, Message[]> = {
-  "Travel Planning Assistant": [
-    {
-      id: "1",
-      role: "user",
-      content: "I need to plan a trip to Paris next month",
-      timestamp: new Date(Date.now() - 7200000),
-      agents: []
-    },
-    {
-      id: "2",
-      role: "assistant",
-      content: "I'd be happy to help you plan your trip to Paris! I've found specialized agents for flights, hotels, and local activities. Let me coordinate them to create the perfect itinerary for you.",
-      timestamp: new Date(Date.now() - 7190000),
-      agents: [{id: "flight-1", name: "FlightFinder Pro"}, {id: "hotel-1", name: "HotelScout AI"}]
-    }
-  ],
-  "Code Review Session": [
-    {
-      id: "1",
-      role: "user",
-      content: "Can you review my React component for performance issues?",
-      timestamp: new Date(Date.now() - 86400000),
-      agents: []
-    },
-    {
-      id: "2",
-      role: "assistant",
-      content: "I'll analyze your React component for performance optimization opportunities. I've engaged our code analysis agents to identify potential improvements.",
-      timestamp: new Date(Date.now() - 86390000),
-      agents: [{id: "code-1", name: "CodeAssist Ultra"}]
-    }
-  ],
-  "Data Analysis Project": [
-    {
-      id: "1",
-      role: "user",
-      content: "I have a dataset that needs analysis and visualization",
-      timestamp: new Date(Date.now() - 172800000),
-      agents: []
-    },
-    {
-      id: "2",
-      role: "assistant",
-      content: "I'll help you analyze and visualize your dataset. Our data analysis agents can process your data and create insightful visualizations.",
-      timestamp: new Date(Date.now() - 172790000),
-      agents: []
-    }
-  ],
-  "Content Creation": [
-    {
-      id: "1",
-      role: "user",
-      content: "Help me write a blog post about AI trends in 2024",
-      timestamp: new Date(Date.now() - 259200000),
-      agents: []
-    },
-    {
-      id: "2",
-      role: "assistant",
-      content: "I'll help you create an engaging blog post about AI trends. Let me coordinate our content creation agents to research and write compelling content.",
-      timestamp: new Date(Date.now() - 259190000),
-      agents: []
-    }
-  ],
-  "Market Research": [
-    {
-      id: "1",
-      role: "user",
-      content: "I need market research on the SaaS industry",
-      timestamp: new Date(Date.now() - 345600000),
-      agents: []
-    },
-    {
-      id: "2",
-      role: "assistant",
-      content: "I'll conduct comprehensive market research on the SaaS industry. Our research agents will gather data on market trends, competitors, and opportunities.",
-      timestamp: new Date(Date.now() - 345590000),
-      agents: []
-    }
-  ]
+const initialMessage: Message = {
+  id: "1",
+  role: "assistant",
+  content: "Hello! I'm Hermes, your AI agent orchestrator. I can help you find and coordinate specialized AI agents for any task. What would you like to accomplish today?",
+  timestamp: new Date(),
+  agents: []
 }
 
 const suggestedPrompts = [
@@ -207,7 +96,9 @@ const suggestedPrompts = [
 ]
 
 function ChatPage() {
-  const [messages, setMessages] = useState<Message[]>(mockMessages)
+  const [messages, setMessages] = useState<Message[]>([initialMessage])
+  const [chatHistories, setChatHistories] = useState<ChatHistory[]>([])
+  const [availableAgents, setAvailableAgents] = useState<any[]>([])
   const [input, setInput] = useState("")
   const [isStreaming, setIsStreaming] = useState(false)
   const [streamingText, setStreamingText] = useState("")
@@ -227,10 +118,17 @@ function ChatPage() {
   const user = useAuthStore((state) => state.user);
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
   const [wsConnection, setWsConnection] = useState<WebSocket | null>(null);
+  const [loadingAgents, setLoadingAgents] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   useEffect(() => {
     setMounted(true)
-  }, [])
+    // Load chat history and available agents when component mounts
+    if (accessToken) {
+      loadChatHistory()
+      loadAvailableAgents()
+    }
+  }, [accessToken])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -253,6 +151,67 @@ function ChatPage() {
   }, [input])
 
   if (!mounted) return null
+
+  const loadChatHistory = async () => {
+    if (!accessToken) return
+    setLoadingHistory(true)
+    try {
+      const response = await api.chat.history(accessToken)
+      if (response && response.conversations) {
+        const histories: ChatHistory[] = response.conversations.map((conv: any) => ({
+          id: conv.id,
+          title: conv.title || "Untitled Chat",
+          lastMessage: conv.last_message || "",
+          timestamp: new Date(conv.created_at),
+          messages: conv.messages || []
+        }))
+        setChatHistories(histories)
+      }
+    } catch (error) {
+      console.error("Failed to load chat history:", error)
+      // Use empty array if API fails
+      setChatHistories([])
+    } finally {
+      setLoadingHistory(false)
+    }
+  }
+
+  const loadAvailableAgents = async () => {
+    setLoadingAgents(true)
+    try {
+      // Try authenticated request first
+      const response = accessToken
+        ? await api.agents.list(accessToken)
+        : await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/agents`).then(res => res.json())
+
+      if (response && response.agents) {
+        setAvailableAgents(response.agents)
+      }
+    } catch (error) {
+      console.error("Failed to load agents:", error)
+      // Use default agents if API fails
+      setAvailableAgents([
+        {
+          id: "flight-finder",
+          name: "FlightFinder Pro",
+          description: "Searches flights across airlines with real-time pricing",
+          category: "travel",
+          rating: 4.9,
+          usage_count: 45200
+        },
+        {
+          id: "code-assist",
+          name: "CodeAssist Ultra",
+          description: "Advanced code generation and debugging assistant",
+          category: "development",
+          rating: 4.9,
+          usage_count: 128000
+        }
+      ])
+    } finally {
+      setLoadingAgents(false)
+    }
+  }
 
   const simulateTokenStreaming = (text: string) => {
     setStreamingText("")
@@ -461,7 +420,7 @@ function ChatPage() {
                 className="w-full"
                 size="lg"
                 onClick={() => {
-                  setMessages(mockMessages)
+                  setMessages([initialMessage])
                   setActiveChat(null)
                 }}
               >
@@ -476,46 +435,59 @@ function ChatPage() {
                 <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-2 mb-3">
                   Recent Chats
                 </h3>
-                {["Travel Planning Assistant", "Code Review Session", "Data Analysis Project", "Content Creation", "Market Research"].map((chat, index) => (
-                  <button
-                    key={index}
-                    onClick={() => {
-                      // Load the selected chat history
-                      const history = chatHistories[chat]
-                      if (history) {
+                {loadingHistory ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+                  </div>
+                ) : chatHistories.length > 0 ? (
+                  chatHistories.slice(0, 5).map((chat) => (
+                    <button
+                      key={chat.id}
+                      onClick={() => {
+                        // Load the selected chat history
                         setMessages([
-                          ...history,
+                          ...chat.messages,
                           {
                             id: Date.now().toString(),
                             role: "assistant",
-                            content: `Welcome back to your ${chat}! I've loaded your previous conversation. How can I help you continue?`,
+                            content: `Welcome back! I've loaded your previous conversation. How can I help you continue?`,
                             timestamp: new Date(),
                             agents: []
                           }
                         ])
-                        setActiveChat(chat)
-                      }
-                    }}
-                    className={`w-full text-left px-3 py-2 rounded-lg transition-colors group ${
-                      activeChat === chat
-                        ? "bg-blue-100 dark:bg-blue-900/30 border-l-2 border-blue-500"
-                        : "hover:bg-gray-100 dark:hover:bg-gray-800"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <MessageSquare className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                          {chat}
-                        </span>
+                        setActiveChat(chat.id)
+                      }}
+                      className={`w-full text-left px-3 py-2 rounded-lg transition-colors group ${
+                        activeChat === chat.id
+                          ? "bg-blue-100 dark:bg-blue-900/30 border-l-2 border-blue-500"
+                          : "hover:bg-gray-100 dark:hover:bg-gray-800"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <MessageSquare className="w-4 h-4 text-gray-400" />
+                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                            {chat.title}
+                          </span>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                       </div>
-                      <ChevronRight className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 ml-6 mt-1">
-                      {index === 0 ? "2 hours ago" : index === 1 ? "Yesterday" : `${index + 1} days ago`}
+                      <p className="text-xs text-gray-500 dark:text-gray-400 ml-6 mt-1">
+                        {new Date(chat.timestamp).toLocaleDateString()}
+                      </p>
+                    </button>
+                  ))
+                ) : (
+                  <div className="text-center py-8">
+                    <MessageSquare className="w-8 h-8 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      No chat history yet
                     </p>
-                  </button>
-                ))}
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                      Start a conversation below
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="mt-6 space-y-2">
@@ -552,9 +524,9 @@ function ChatPage() {
                       <User2 className="w-5 h-5 text-white" />
                     </div>
                     <div className="flex-1">
-                      <div className="font-medium text-sm">Premium User</div>
+                      <div className="font-medium text-sm">{user?.full_name || user?.email || "User"}</div>
                       <div className="text-xs text-gray-600 dark:text-gray-400">
-                        Unlimited agents • Priority support
+                        {user?.subscription_tier === "PRO" ? "Pro" : user?.subscription_tier === "ENTERPRISE" ? "Enterprise" : "Free"} Plan
                       </div>
                     </div>
                     <Button variant="ghost" size="icon" onClick={() => {
