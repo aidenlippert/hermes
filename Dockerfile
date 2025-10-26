@@ -19,8 +19,11 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy application code
 COPY . .
 
-# Make scripts executable
-RUN chmod +x start.sh entrypoint.sh
+# Ensure our wrapper bin is on PATH so it intercepts 'uvicorn' even if Railway overrides Start Command
+ENV PATH="/app/bin:${PATH}"
+
+# Make scripts executable (including uvicorn wrapper)
+RUN chmod +x start.sh entrypoint.sh bin/uvicorn
 
 # Expose port
 EXPOSE 8000

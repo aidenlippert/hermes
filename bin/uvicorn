@@ -1,0 +1,32 @@
+#!/bin/bash
+set -e
+
+# Wrapper to ensure PORT argument is a proper integer even if passed as literal '$PORT'
+
+args=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --port)
+      shift
+      val="$1"
+      if [[ "$val" == '$PORT' || "$val" == '"$PORT"' || "$val" == "'$PORT'" ]]; then
+        val="${PORT:-8000}"
+      fi
+      args+=("--port" "$val")
+      ;;
+    --port=*)
+      val="${1#--port=}"
+      if [[ "$val" == '$PORT' || "$val" == '"$PORT"' || "$val" == "'$PORT'" ]]; then
+        val="${PORT:-8000}"
+      fi
+      args+=("--port=$val")
+      ;;
+    *)
+      args+=("$1")
+      ;;
+  esac
+  shift
+done
+
+echo "🔧 uvicorn wrapper active. Args: ${args[*]}"
+exec /usr/local/bin/uvicorn "${args[@]}"
