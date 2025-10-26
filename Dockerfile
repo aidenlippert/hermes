@@ -1,7 +1,7 @@
-FROM python:3.10-slim
+FROM python:3.10.12-slim
 
-# Bust Railway's cache - v2
-ENV RAILWAY_CACHE_BUST=v2
+# Bust Railway's cache - changed base image
+ENV RAILWAY_CACHE_BUST=v3
 
 # Force rebuild - updated 2025-10-25
 WORKDIR /app
