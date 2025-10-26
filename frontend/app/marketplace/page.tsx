@@ -269,7 +269,7 @@ export default function MarketplacePage() {
 
           // Extract unique categories from agents
           const uniqueCategories = Array.from(new Set(data.agents.map((a: Agent) => a.category)))
-            .filter(Boolean)
+            .filter((cat): cat is string => Boolean(cat))
             .map(cat => ({
               name: cat.charAt(0).toUpperCase() + cat.slice(1),
               value: cat,
