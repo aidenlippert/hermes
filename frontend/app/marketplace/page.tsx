@@ -189,7 +189,7 @@ const AgentCard = ({ agent }: { agent: Agent }) => {
 
 const Header = () => (
   <header className="sticky top-0 z-50 flex items-center justify-between whitespace-nowrap border-b border-solid border-white/10 px-10 py-3 bg-background-dark/80 backdrop-blur-sm">
-    <div className="flex items-center gap-4">
+    <Link href="/" className="flex items-center gap-4 cursor-pointer hover:opacity-80 transition-opacity">
       <div className="size-6 text-primary">
         <svg fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
           <path
@@ -205,16 +205,16 @@ const Header = () => (
         </svg>
       </div>
       <h2 className="text-[#E0E0E0] text-lg font-bold leading-tight tracking-[-0.015em]">Hermes</h2>
-    </div>
+    </Link>
     <div className="flex flex-1 justify-end gap-8">
       <div className="flex items-center gap-9">
-        <Link className="text-[#E0E0E0] text-sm font-medium leading-normal transition-colors hover:text-primary" href="#">
+        <Link className="text-[#E0E0E0] text-sm font-medium leading-normal transition-colors hover:text-primary" href="/marketplace">
           Marketplace
         </Link>
-        <Link className="text-[#E0E0E0] text-sm font-medium leading-normal transition-colors hover:text-primary" href="#">
-          My Agents
+        <Link className="text-[#E0E0E0] text-sm font-medium leading-normal transition-colors hover:text-primary" href="/chat">
+          Dashboard
         </Link>
-        <Link className="text-[#E0E0E0] text-sm font-medium leading-normal transition-colors hover:text-primary" href="#">
+        <Link className="text-[#E0E0E0] text-sm font-medium leading-normal transition-colors hover:text-primary" href="/auth/login">
           API Docs
         </Link>
       </div>
