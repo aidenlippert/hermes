@@ -19,11 +19,14 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy application code
 COPY . .
 
-# Make start script executable
-RUN chmod +x start.sh
+# Make scripts executable
+RUN chmod +x start.sh entrypoint.sh
 
 # Expose port
 EXPOSE 8000
 
-# Start the application - inline everything to avoid Railway cache bugs
-CMD ["/bin/bash", "-c", "echo '🚀 Starting Hermes' && echo 'PORT='${PORT} && alembic upgrade head && uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Set entrypoint that shells any provided command so $PORT expands even if Railway overrides CMD
+ENTRYPOINT ["./entrypoint.sh"]
+
+# Default command falls back to start script
+CMD ["./start.sh"]
