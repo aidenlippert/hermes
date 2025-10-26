@@ -49,9 +49,9 @@ if __name__ == "__main__":
         </div>
         <div className="hidden md:flex flex-1 justify-end gap-8">
           <div className="flex items-center gap-9">
-            <Link className="text-white text-sm font-medium leading-normal hover:text-primary transition-colors" href="#">Docs</Link>
-            <Link className="text-white text-sm font-medium leading-normal hover:text-primary transition-colors" href="#">API Reference</Link>
-            <Link className="text-white text-sm font-medium leading-normal hover:text-primary transition-colors" href="#">Console</Link>
+            <Link className="text-white text-sm font-medium leading-normal hover:text-primary transition-colors" href="/developer/guide">Docs</Link>
+            <Link className="text-white text-sm font-medium leading-normal hover:text-primary transition-colors" href="/developer/api-docs">API Reference</Link>
+            <Link className="text-white text-sm font-medium leading-normal hover:text-primary transition-colors" href="/chat">Console</Link>
           </div>
           <button className="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-primary hover:brightness-110 transition-all text-white text-sm font-bold leading-normal tracking-[0.015em]">
             <span className="truncate">Download SDK</span>

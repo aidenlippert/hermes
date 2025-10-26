@@ -43,34 +43,34 @@ const Sidebar = () => (
           <h2 className="text-white text-lg font-bold leading-tight tracking-[-0.015em]">Hermes</h2>
         </div>
         <div className="flex flex-col gap-2">
-          <Link className="flex items-center gap-3 px-3 py-2 text-gray-400 hover:bg-white/5 rounded-lg transition-colors" href="#">
+          <Link className="flex items-center gap-3 px-3 py-2 text-gray-400 hover:bg-white/5 rounded-lg transition-colors" href="/chat">
             <LayoutGrid className="text-2xl" />
             <p className="text-sm font-medium leading-normal">Dashboard</p>
           </Link>
-          <Link className="flex items-center gap-3 px-3 py-2 rounded-lg bg-primary/20 text-white" href="#">
+          <Link className="flex items-center gap-3 px-3 py-2 rounded-lg bg-primary/20 text-white" href="/marketplace">
             <Bot className="text-2xl" />
             <p className="text-sm font-medium leading-normal">Agents</p>
           </Link>
-          <Link className="flex items-center gap-3 px-3 py-2 text-gray-400 hover:bg-white/5 rounded-lg transition-colors" href="#">
+          <Link className="flex items-center gap-3 px-3 py-2 text-gray-400 hover:bg-white/5 rounded-lg transition-colors" href="/developer/workflow-builder">
             <GitFork className="text-2xl" />
             <p className="text-sm font-medium leading-normal">Workflows</p>
           </Link>
-          <Link className="flex items-center gap-3 px-3 py-2 text-gray-400 hover:bg-white/5 rounded-lg transition-colors" href="#">
+          <Link className="flex items-center gap-3 px-3 py-2 text-gray-400 hover:bg-white/5 rounded-lg transition-colors" href="/developer/api-docs">
             <Key className="text-2xl" />
             <p className="text-sm font-medium leading-normal">API Keys</p>
           </Link>
-          <Link className="flex items-center gap-3 px-3 py-2 text-gray-400 hover:bg-white/5 rounded-lg transition-colors" href="#">
+          <Link className="flex items-center gap-3 px-3 py-2 text-gray-400 hover:bg-white/5 rounded-lg transition-colors" href="/marketplace">
             <Store className="text-2xl" />
             <p className="text-sm font-medium leading-normal">Marketplace</p>
           </Link>
         </div>
       </div>
       <div className="flex flex-col gap-1">
-        <Link className="flex items-center gap-3 px-3 py-2 text-gray-400 hover:bg-white/5 rounded-lg transition-colors" href="#">
+        <Link className="flex items-center gap-3 px-3 py-2 text-gray-400 hover:bg-white/5 rounded-lg transition-colors" href="/developer/guide">
           <FileText className="text-2xl" />
           <p className="text-sm font-medium leading-normal">Documentation</p>
         </Link>
-        <Link className="flex items-center gap-3 px-3 py-2 text-gray-400 hover:bg-white/5 rounded-lg transition-colors" href="#">
+        <Link className="flex items-center gap-3 px-3 py-2 text-gray-400 hover:bg-white/5 rounded-lg transition-colors" href="/help-center">
           <HelpCircle className="text-2xl" />
           <p className="text-sm font-medium leading-normal">Support</p>
         </Link>

@@ -79,7 +79,8 @@ export default function MeshDashboard() {
 
   const fetchAgents = async () => {
     try {
-      const res = await fetch("http://localhost:8000/api/v1/mesh/agents");
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const res = await fetch(`${apiUrl}/api/v1/mesh/agents`);
       const data = await res.json();
       setAgents(data.agents || []);
       setLoading(false);
@@ -91,7 +92,8 @@ export default function MeshDashboard() {
 
   const fetchContract = async (contractId: string) => {
     try {
-      const res = await fetch(`http://localhost:8000/api/v1/mesh/contracts/${contractId}`);
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const res = await fetch(`${apiUrl}/api/v1/mesh/contracts/${contractId}`);
       const data = await res.json();
       setContracts((prev) => new Map(prev).set(contractId, data));
       
@@ -113,7 +115,8 @@ export default function MeshDashboard() {
     e.preventDefault();
 
     try {
-      const res = await fetch("http://localhost:8000/api/v1/mesh/contracts", {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const res = await fetch(`${apiUrl}/api/v1/mesh/contracts`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

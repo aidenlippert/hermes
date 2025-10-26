@@ -70,16 +70,16 @@ export default function SubmitAgentPage() {
               </div>
               <div className="hidden md:flex flex-1 justify-end gap-8">
                 <div className="flex items-center gap-9">
-                  <Link className="text-[#EAEAEA] text-sm font-medium leading-normal hover:text-primary transition-colors" href="#">
+                  <Link className="text-[#EAEAEA] text-sm font-medium leading-normal hover:text-primary transition-colors" href="/chat">
                     Dashboard
                   </Link>
-                  <Link className="text-primary text-sm font-medium leading-normal" href="#">
+                  <Link className="text-primary text-sm font-medium leading-normal" href="/marketplace">
                     Agents
                   </Link>
-                  <Link className="text-[#EAEAEA] text-sm font-medium leading-normal hover:text-primary transition-colors" href="#">
+                  <Link className="text-[#EAEAEA] text-sm font-medium leading-normal hover:text-primary transition-colors" href="/developer/api-docs">
                     API Keys
                   </Link>
-                  <Link className="text-[#EAEAEA] text-sm font-medium leading-normal hover:text-primary transition-colors" href="#">
+                  <Link className="text-[#EAEAEA] text-sm font-medium leading-normal hover:text-primary transition-colors" href="/developer/guide">
                     Documentation
                   </Link>
                 </div>

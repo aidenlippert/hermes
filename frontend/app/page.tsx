@@ -33,7 +33,7 @@ export default function HomePage() {
             <Link className="text-white text-sm font-medium leading-normal hover:text-[#FF1744] transition-colors" href="/chat">
               Dashboard
             </Link>
-            <Link className="text-white text-sm font-medium leading-normal hover:text-[#FF1744] transition-colors" href="#">
+            <Link className="text-white text-sm font-medium leading-normal hover:text-[#FF1744] transition-colors" href="/developer/api-docs">
               Docs
             </Link>
           </div>

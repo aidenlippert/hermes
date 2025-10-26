@@ -61,10 +61,10 @@ export default function HelpCenterPage() {
                 </div>
               </div>
               <nav className="mt-4 flex flex-col gap-2">
-                <NavLink href="#" icon={LayoutDashboard} label="Dashboard" />
-                <NavLink href="#" icon={Bot} label="Agents" />
-                <NavLink href="#" icon={GitFork} label="Workflows" />
-                <NavLink href="#" icon={HelpCircle} label="Help Center" active />
+                <NavLink href="/chat" icon={LayoutDashboard} label="Dashboard" />
+                <NavLink href="/marketplace" icon={Bot} label="Agents" />
+                <NavLink href="/developer/workflow-builder" icon={GitFork} label="Workflows" />
+                <NavLink href="/help-center" icon={HelpCircle} label="Help Center" active />
               </nav>
             </div>
             <div className="flex flex-col gap-4">
@@ -72,8 +72,8 @@ export default function HelpCenterPage() {
                 <span className="truncate">New Workflow</span>
               </button>
               <div className="flex flex-col gap-1 border-t border-white/10 pt-4">
-                <NavLink href="#" icon={Settings} label="Settings" />
-                <NavLink href="#" icon={LogOut} label="Logout" />
+                <NavLink href="/developer/api-docs" icon={Settings} label="Settings" />
+                <NavLink href="/auth/login" icon={LogOut} label="Logout" />
               </div>
             </div>
           </div>
@@ -81,7 +81,7 @@ export default function HelpCenterPage() {
         <main className="flex-1 overflow-y-auto">
           <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
             <div className="flex flex-wrap gap-2 pb-4">
-              <a className="text-gray-400 text-sm font-medium leading-normal hover:text-white" href="#">Hermes</a>
+              <Link className="text-gray-400 text-sm font-medium leading-normal hover:text-white" href="/">Hermes</Link>
               <span className="text-gray-500 text-sm font-medium leading-normal">/</span>
               <span className="text-white text-sm font-medium leading-normal">Help Center</span>
             </div>
