@@ -182,6 +182,12 @@ async def root():
     }
 
 
+@app.get("/health")
+async def health_check():
+    """Simple health check for Railway"""
+    return {"status": "healthy"}
+
+
 @app.get("/api/v1/health")
 async def health():
     """Health check"""
