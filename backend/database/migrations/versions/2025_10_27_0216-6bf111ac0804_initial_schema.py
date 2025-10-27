@@ -50,7 +50,7 @@ def upgrade() -> None:
         sa.Column('description', sa.String(), nullable=True),
         sa.Column('category', sa.String(), nullable=True),
         sa.Column('capabilities', postgresql.JSON(astext_type=sa.Text()), nullable=True),
-        sa.Column('endpoint_url', sa.String(), nullable=False),
+        sa.Column('endpoint', sa.String(), nullable=False),
         sa.Column('api_key', sa.String(), nullable=True),
         sa.Column('owner_id', sa.String(), nullable=True),
         sa.Column('is_active', sa.Boolean(), server_default='true', nullable=True),
