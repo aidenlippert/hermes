@@ -33,9 +33,12 @@ def upgrade() -> None:
         sa.Column('role', postgresql.ENUM('user', 'agent_developer', 'admin', name='userrole', create_type=False), nullable=False),
         sa.Column('subscription_tier', postgresql.ENUM('free', 'pro', 'enterprise', name='subscriptiontier', create_type=False), nullable=False),
         sa.Column('is_active', sa.Boolean(), server_default='true', nullable=True),
+        sa.Column('is_verified', sa.Boolean(), server_default='false', nullable=True),
         sa.Column('total_requests', sa.Integer(), server_default='0', nullable=True),
         sa.Column('requests_this_month', sa.Integer(), server_default='0', nullable=True),
+        sa.Column('total_spent', sa.Float(), server_default='0', nullable=True),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
+        sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
         sa.Column('last_login', sa.DateTime(timezone=True), nullable=True),
         sa.PrimaryKeyConstraint('id')
     )
