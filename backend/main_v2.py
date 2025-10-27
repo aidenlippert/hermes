@@ -919,17 +919,16 @@ async def startup():
     logger.info("🚀 Hermes Platform Starting...")
 
     try:
-        # Initialize database with timeout
-        try:
-            import asyncio
-            await asyncio.wait_for(init_db(), timeout=10.0)
-            logger.info("✅ PostgreSQL initialized")
-        except asyncio.TimeoutError:
-            logger.error("❌ PostgreSQL init timed out after 10s")
-            raise
-        except Exception as e:
-            logger.error(f"❌ PostgreSQL init failed: {e}")
-            raise
+        # try:
+        #     import asyncio
+        #     await asyncio.wait_for(init_db(), timeout=10.0)
+        #     logger.info("✅ PostgreSQL initialized")
+        # except asyncio.TimeoutError:
+        #     logger.error("❌ PostgreSQL init timed out after 10s")
+        #     raise
+        # except Exception as e:
+        #     logger.error(f"❌ PostgreSQL init failed: {e}")
+        #     raise
 
         # Initialize Redis with timeout
         try:
