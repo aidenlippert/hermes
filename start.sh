@@ -19,5 +19,5 @@ fi
 # Start server with proper port handling
 PORT=${PORT:-8000}
 echo "🌐 Starting uvicorn on port $PORT..."
-echo "Command: uvicorn backend.main:app --host 0.0.0.0 --port $PORT"
-exec uvicorn backend.main:app --host 0.0.0.0 --port "$PORT"
+echo "Command: uvicorn backend.main_v2:app --host 0.0.0.0 --port $PORT"
+exec uvicorn backend.main_v2:app --host 0.0.0.0 --port "$PORT"
