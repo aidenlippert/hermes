@@ -17,10 +17,10 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Create enum types
-    op.execute("CREATE TYPE contractstatus AS ENUM ('open', 'bidding', 'awarded', 'in_progress', 'delivered', 'validated', 'settled', 'cancelled', 'failed')")
-    op.execute("CREATE TYPE messagetype AS ENUM ('query', 'response', 'notification', 'proposal', 'acceptance', 'rejection', 'termination')")
-    op.execute("CREATE TYPE conversationstatus AS ENUM ('active', 'awaiting_response', 'resolved', 'failed', 'terminated')")
+    # Create enum types (only if they don't exist)
+    op.execute("DO $$ BEGIN CREATE TYPE contractstatus AS ENUM ('open', 'bidding', 'awarded', 'in_progress', 'delivered', 'validated', 'settled', 'cancelled', 'failed'); EXCEPTION WHEN duplicate_object THEN null; END $$;")
+    op.execute("DO $$ BEGIN CREATE TYPE messagetype AS ENUM ('query', 'response', 'notification', 'proposal', 'acceptance', 'rejection', 'termination'); EXCEPTION WHEN duplicate_object THEN null; END $$;")
+    op.execute("DO $$ BEGIN CREATE TYPE conversationstatus AS ENUM ('active', 'awaiting_response', 'resolved', 'failed', 'terminated'); EXCEPTION WHEN duplicate_object THEN null; END $$;")
     
     # Contracts table
     op.create_table(
