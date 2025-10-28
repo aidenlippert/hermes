@@ -34,6 +34,9 @@ def upgrade() -> None:
     op.execute("DROP TABLE IF EXISTS agents CASCADE")
     op.execute("DROP TABLE IF EXISTS users CASCADE")
     
+    # Drop alembic's version tracking table to ensure a completely fresh start
+    op.execute("DROP TABLE IF EXISTS alembic_version CASCADE")
+
     # Drop all custom types (if they exist)
     op.execute("DROP TYPE IF EXISTS conversationstatus CASCADE")
     op.execute("DROP TYPE IF EXISTS messagetype CASCADE")
