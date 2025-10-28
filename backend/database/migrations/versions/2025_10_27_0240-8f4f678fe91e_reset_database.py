@@ -42,6 +42,7 @@ def upgrade() -> None:
     op.execute("DROP TYPE IF EXISTS messagetype CASCADE")
     op.execute("DROP TYPE IF EXISTS contractstatus CASCADE")
     op.execute("DROP TYPE IF EXISTS taskstatus CASCADE")
+    op.execute("DROP TYPE IF EXISTS agentstatus CASCADE")
     op.execute("DROP TYPE IF EXISTS subscriptiontier CASCADE")
     op.execute("DROP TYPE IF EXISTS userrole CASCADE")
     
