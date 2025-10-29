@@ -44,6 +44,8 @@ from backend.services.seed_agents import seed_travel_agents
 from backend.services.real_agents import execute_real_agents
 from backend.websocket.manager import manager
 from backend.api import v1_websocket
+from backend.services.reputation import recalculate_all_trust_scores
+from backend.database.connection import AsyncSessionLocal
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -51,6 +53,8 @@ logger = logging.getLogger(__name__)
 # Startup state
 startup_complete = False
 startup_error = None
+_trust_recalc_task: asyncio.Task | None = None
+TRUST_RECALC_INTERVAL_SECONDS = int(os.getenv("TRUST_RECALC_INTERVAL_SECONDS", "900"))  # 15 minutes default
 
 # Initialize FastAPI
 app = FastAPI(
@@ -944,13 +948,28 @@ async def startup():
 
         # Seed travel agents (non-blocking)
         try:
-            from backend.database.connection import AsyncSessionLocal
             async with AsyncSessionLocal() as db:
                 await seed_travel_agents(db)
         except Exception as e:
             logger.error(f"❌ Agent seeding failed: {e}")
             # Don't fail startup for seeding issues
             pass
+
+        # Kick off background trust score recalculation loop
+        async def _trust_recalc_loop():
+            # Initial short delay to allow startup and seed to complete
+            await asyncio.sleep(5)
+            while True:
+                try:
+                    async with AsyncSessionLocal() as db:
+                        await recalculate_all_trust_scores(db)
+                except Exception as e:
+                    logger.error(f"❌ Trust score recalculation failed: {e}")
+                # Sleep until next cycle
+                await asyncio.sleep(TRUST_RECALC_INTERVAL_SECONDS)
+
+        global _trust_recalc_task
+        _trust_recalc_task = asyncio.create_task(_trust_recalc_loop())
 
         startup_complete = True
         logger.info("✅ Hermes Platform Ready!")
@@ -967,6 +986,14 @@ async def startup():
 async def shutdown():
     """Cleanup on shutdown"""
     logger.info("👋 Hermes Platform Shutting down...")
+    # Cancel background trust recalculation task
+    global _trust_recalc_task
+    if _trust_recalc_task and not _trust_recalc_task.done():
+        _trust_recalc_task.cancel()
+        try:
+            await _trust_recalc_task
+        except Exception:
+            pass
     await close_redis()
     await a2a_client.close()
 

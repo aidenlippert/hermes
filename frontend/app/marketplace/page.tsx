@@ -253,22 +253,34 @@ export default function MarketplacePage() {
   const loadAgents = async () => {
     setLoading(true)
     try {
-      // Try to fetch agents from backend
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/agents`)
+      // Fetch agents from backend (v2 endpoint)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/marketplace`)
 
       if (response.ok) {
         const data = await response.json()
         if (data.agents && data.agents.length > 0) {
-          setAgents(data.agents)
-          // Split into featured and regular agents
-          const featured = data.agents.filter((a: Agent) => a.is_featured).slice(0, 4)
-          const regular = data.agents.filter((a: Agent) => !a.is_featured).slice(0, 8)
+          // Map backend fields to UI expectations
+          const mappedAgents = data.agents.map((a: any) => ({
+            id: a.id,
+            name: a.name,
+            description: a.description,
+            category: a.category || "general",
+            rating: typeof a.average_rating === 'number' ? a.average_rating : 0,
+            usage_count: typeof a.total_calls === 'number' ? a.total_calls : 0,
+            is_featured: !!a.is_featured,
+            price: a.is_free ? 0 : (a.cost_per_request ?? 0)
+          })) as Agent[]
 
-          setFeaturedAgents(featured.length > 0 ? featured : data.agents.slice(0, 4))
-          setAllAgents(regular.length > 0 ? regular : data.agents.slice(4, 12))
+          setAgents(mappedAgents)
+          // Split into featured and regular agents
+          const featured = mappedAgents.filter((a: Agent) => a.is_featured).slice(0, 4)
+          const regular = mappedAgents.filter((a: Agent) => !a.is_featured).slice(0, 8)
+
+          setFeaturedAgents(featured.length > 0 ? featured : mappedAgents.slice(0, 4))
+          setAllAgents(regular.length > 0 ? regular : mappedAgents.slice(4, 12))
 
           // Extract unique categories from agents
-          const uniqueCategories = Array.from(new Set(data.agents.map((a: Agent) => a.category)))
+          const uniqueCategories = Array.from(new Set(mappedAgents.map((a: Agent) => a.category)))
             .filter((cat): cat is string => Boolean(cat))
             .map(cat => ({
               name: cat.charAt(0).toUpperCase() + cat.slice(1),
