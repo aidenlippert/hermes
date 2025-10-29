@@ -1,7 +1,7 @@
 """add_all_missing_agent_columns
 
 Revision ID: a830587d5e99
-Revises: effd783ff13e
+Revises: mesh_protocol_v1
 Create Date: 2025-10-27 16:52:54.286115
 
 """
@@ -12,7 +12,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = 'a830587d5e99'
-down_revision = 'effd783ff13e'
+down_revision = 'mesh_protocol_v1'
 branch_labels = None
 depends_on = None
 
