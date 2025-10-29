@@ -20,7 +20,8 @@ depends_on = None
 def upgrade() -> None:
     # Add all missing columns to agents table to match the Agent model
     # Create enum type idempotently
-    op.execute("DO $$ BEGIN CREATE TYPE agentstatus AS ENUM ('pending_review', 'active', 'suspended', 'deprecated'); EXCEPTION WHEN duplicate_object THEN null; END $$;")
+    # Use enum labels that match Python Enum names (SQLAlchemy stores .name by default)
+    op.execute("DO $$ BEGIN CREATE TYPE agentstatus AS ENUM ('ACTIVE', 'INACTIVE', 'PENDING_REVIEW', 'REJECTED'); EXCEPTION WHEN duplicate_object THEN null; END $$;")
 
     # Add columns idempotently (will skip if they already exist)
     op.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS version VARCHAR DEFAULT '1.0.0'")
@@ -29,7 +30,7 @@ def upgrade() -> None:
     op.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS successful_calls INTEGER DEFAULT 0")
     op.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS failed_calls INTEGER DEFAULT 0")
     op.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS average_duration DOUBLE PRECISION DEFAULT 0.0")
-    op.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS status agentstatus DEFAULT 'pending_review'")
+    op.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS status agentstatus DEFAULT 'PENDING_REVIEW'")
     op.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS is_featured BOOLEAN DEFAULT false")
     op.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT false")
     op.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS agent_card JSONB")
