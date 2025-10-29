@@ -19,9 +19,51 @@ depends_on = None
 
 def upgrade() -> None:
     # Add all missing columns to agents table to match the Agent model
-    # Create enum type idempotently
-    # Use enum labels that match Python Enum names (SQLAlchemy stores .name by default)
-    op.execute("DO $$ BEGIN CREATE TYPE agentstatus AS ENUM ('ACTIVE', 'INACTIVE', 'PENDING_REVIEW', 'REJECTED'); EXCEPTION WHEN duplicate_object THEN null; END $$;")
+    # Ensure enum type exists and matches SQLAlchemy Enum values (lowercase strings)
+    # 1) Create type if missing with lowercase values
+    op.execute("""
+    DO $$
+    BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'agentstatus') THEN
+            CREATE TYPE agentstatus AS ENUM ('active', 'inactive', 'pending_review', 'rejected');
+        END IF;
+    END$$;
+    """)
+
+    # 2) If enum exists with uppercase values from older migrations, rename them to lowercase
+    op.execute("""
+    DO $$
+    BEGIN
+        IF EXISTS (
+            SELECT 1 FROM pg_type t
+            JOIN pg_enum e ON t.oid = e.enumtypid
+            WHERE t.typname = 'agentstatus' AND e.enumlabel = 'ACTIVE'
+        ) THEN
+            ALTER TYPE agentstatus RENAME VALUE 'ACTIVE' TO 'active';
+        END IF;
+        IF EXISTS (
+            SELECT 1 FROM pg_type t
+            JOIN pg_enum e ON t.oid = e.enumtypid
+            WHERE t.typname = 'agentstatus' AND e.enumlabel = 'INACTIVE'
+        ) THEN
+            ALTER TYPE agentstatus RENAME VALUE 'INACTIVE' TO 'inactive';
+        END IF;
+        IF EXISTS (
+            SELECT 1 FROM pg_type t
+            JOIN pg_enum e ON t.oid = e.enumtypid
+            WHERE t.typname = 'agentstatus' AND e.enumlabel = 'PENDING_REVIEW'
+        ) THEN
+            ALTER TYPE agentstatus RENAME VALUE 'PENDING_REVIEW' TO 'pending_review';
+        END IF;
+        IF EXISTS (
+            SELECT 1 FROM pg_type t
+            JOIN pg_enum e ON t.oid = e.enumtypid
+            WHERE t.typname = 'agentstatus' AND e.enumlabel = 'REJECTED'
+        ) THEN
+            ALTER TYPE agentstatus RENAME VALUE 'REJECTED' TO 'rejected';
+        END IF;
+    END$$;
+    """)
 
     # Add columns idempotently (will skip if they already exist)
     op.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS version VARCHAR DEFAULT '1.0.0'")
@@ -30,7 +72,7 @@ def upgrade() -> None:
     op.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS successful_calls INTEGER DEFAULT 0")
     op.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS failed_calls INTEGER DEFAULT 0")
     op.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS average_duration DOUBLE PRECISION DEFAULT 0.0")
-    op.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS status agentstatus DEFAULT 'PENDING_REVIEW'")
+    op.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS status agentstatus DEFAULT 'pending_review'")
     op.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS is_featured BOOLEAN DEFAULT false")
     op.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT false")
     op.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS agent_card JSONB")

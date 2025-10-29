@@ -7,6 +7,8 @@ set -e
 # ALWAYS run migrations first, regardless of what command Railway executes
 echo "📦 Running database migrations..."
 if [ -n "$DATABASE_URL" ]; then
+  if [ "${FORCE_DB_RESET}" = "true" ]; then
+    echo "🧨 FORCE_DB_RESET=true — performing destructive reset then migrating to head"
     # STEP 0: Drop alembic_version table to force a clean migration run
     echo "🔑 Step 0: Dropping alembic_version table to force fresh migrations..."
     PGPASSWORD=$(echo "$DATABASE_URL" | sed -n 's/.*:\([^@]*\)@.*/\1/p') \
@@ -23,6 +25,10 @@ if [ -n "$DATABASE_URL" ]; then
     # STEP 2: Run all subsequent migrations up to head.
     echo "🔑 Step 2: Running all migrations up to head..."
     alembic upgrade head 2>&1 || echo "⚠️ Migration failed or no migrations needed"
+  else
+    echo "🔄 Running safe migrations to head (data will be preserved). Set FORCE_DB_RESET=true to wipe DB."
+    alembic upgrade head 2>&1 || echo "⚠️ Migration failed or no migrations needed"
+  fi
 else
     echo "⚠️ No DATABASE_URL set, skipping migrations"
 fi
