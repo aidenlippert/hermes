@@ -77,7 +77,9 @@ app.include_router(v1_websocket.router, prefix="/api/v1", tags=["WebSocket"])
 
 # Include Marketplace router
 from backend.api import marketplace
+from backend.api import a2a
 app.include_router(marketplace.router)
+app.include_router(a2a.router)
 
 # Security
 security = HTTPBearer()

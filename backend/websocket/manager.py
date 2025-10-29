@@ -11,7 +11,7 @@ Features:
 """
 
 import logging
-from typing import Dict, Set
+from typing import Dict, Set, Any, Optional
 from fastapi import WebSocket
 import json
 import asyncio
@@ -33,9 +33,12 @@ class ConnectionManager:
         # Maps user_id -> set of WebSocket connections (for user-wide updates)
         self.user_connections: Dict[str, Set[WebSocket]] = {}
 
+        # Maps agent_id -> set of WebSocket connections (for A2A)
+        self.agent_connections: Dict[str, Set[WebSocket]] = {}
+
         logger.info("📡 WebSocket Manager initialized")
 
-    async def connect(self, websocket: WebSocket, task_id: str, user_id: str = None):
+    async def connect(self, websocket: WebSocket, task_id: str, user_id: Optional[str] = None):
         """
         Accept a new WebSocket connection.
 
@@ -59,7 +62,7 @@ class ConnectionManager:
 
         logger.info(f"🔌 WebSocket connected - Task: {task_id[:8]}..., Subscribers: {len(self.active_connections[task_id])}")
 
-    def disconnect(self, websocket: WebSocket, task_id: str, user_id: str = None):
+    def disconnect(self, websocket: WebSocket, task_id: str, user_id: Optional[str] = None):
         """
         Remove a WebSocket connection.
 
@@ -82,7 +85,40 @@ class ConnectionManager:
 
         logger.info(f"🔌 WebSocket disconnected - Task: {task_id[:8]}...")
 
-    async def send_to_task(self, task_id: str, event: Dict):
+    async def connect_agent(self, websocket: WebSocket, agent_id: str):
+        """Accept a WebSocket connection for an agent presence channel"""
+        await websocket.accept()
+        if agent_id not in self.agent_connections:
+            self.agent_connections[agent_id] = set()
+        self.agent_connections[agent_id].add(websocket)
+        logger.info(f"🤖 Agent connected: {agent_id}")
+
+    def disconnect_agent(self, websocket: WebSocket, agent_id: str):
+        """Remove an agent WebSocket connection"""
+        if agent_id in self.agent_connections:
+            self.agent_connections[agent_id].discard(websocket)
+            if not self.agent_connections[agent_id]:
+                del self.agent_connections[agent_id]
+        logger.info(f"🤖 Agent disconnected: {agent_id}")
+
+    async def send_to_agent(self, agent_id: str, event: Dict[str, Any]):
+        """Send event to all sockets for a specific agent"""
+        if agent_id not in self.agent_connections:
+            return
+        if "timestamp" not in event:
+            from datetime import datetime, timezone
+            event["timestamp"] = datetime.now(timezone.utc).isoformat()
+        disconnected = []
+        for connection in self.agent_connections[agent_id]:
+            try:
+                await connection.send_json(event)
+            except Exception as e:
+                logger.error(f"❌ Failed to send to agent socket: {e}")
+                disconnected.append(connection)
+        for connection in disconnected:
+            self.disconnect_agent(connection, agent_id)
+
+    async def send_to_task(self, task_id: str, event: Dict[str, Any]):
         """
         Send event to all clients subscribed to a specific task.
 
@@ -95,8 +131,8 @@ class ConnectionManager:
 
         # Add timestamp if not present
         if "timestamp" not in event:
-            from datetime import datetime
-            event["timestamp"] = datetime.utcnow().isoformat()
+            from datetime import datetime, timezone
+            event["timestamp"] = datetime.now(timezone.utc).isoformat()
 
         # Broadcast to all connections
         disconnected = []
@@ -111,7 +147,7 @@ class ConnectionManager:
         for connection in disconnected:
             self.disconnect(connection, task_id)
 
-    async def send_to_user(self, user_id: str, event: Dict):
+    async def send_to_user(self, user_id: str, event: Dict[str, Any]):
         """
         Send event to all connections for a specific user.
 
@@ -124,8 +160,8 @@ class ConnectionManager:
 
         # Add timestamp
         if "timestamp" not in event:
-            from datetime import datetime
-            event["timestamp"] = datetime.utcnow().isoformat()
+            from datetime import datetime, timezone
+            event["timestamp"] = datetime.now(timezone.utc).isoformat()
 
         # Broadcast
         disconnected = []
@@ -197,14 +233,21 @@ class ConnectionManager:
     def get_stats(self) -> Dict:
         """Get WebSocket statistics"""
         total_connections = sum(len(conns) for conns in self.active_connections.values())
+        total_agent_conns = sum(len(conns) for conns in self.agent_connections.values())
 
         return {
             "total_connections": total_connections,
+            "total_agent_connections": total_agent_conns,
             "active_tasks": len(self.active_connections),
             "active_users": len(self.user_connections),
+            "active_agents": len(self.agent_connections),
             "tasks": {
                 task_id[:8] + "...": len(conns)
                 for task_id, conns in self.active_connections.items()
+            },
+            "agents": {
+                agent_id: len(conns)
+                for agent_id, conns in self.agent_connections.items()
             }
         }
 
