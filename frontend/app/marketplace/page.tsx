@@ -244,6 +244,8 @@ export default function MarketplacePage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [sortOption, setSortOption] = useState<'trust' | 'rating' | 'usage'>('trust')
+  const [freeOnly, setFreeOnly] = useState(false)
+  const [topAgents, setTopAgents] = useState<Agent[]>([])
   const accessToken = useAuthStore((state) => state.accessToken)
   const [categories, setCategories] = useState([
     { name: "All", value: "all", active: true },
@@ -256,7 +258,8 @@ export default function MarketplacePage() {
 
   useEffect(() => {
     loadAgents()
-  }, [sortOption])
+    loadTopAgents()
+  }, [sortOption, freeOnly])
 
   const loadAgents = async () => {
     setLoading(true)
@@ -264,6 +267,7 @@ export default function MarketplacePage() {
       // Fetch agents from backend (v2 endpoint)
       const params = new URLSearchParams()
       if (sortOption) params.set('sort', sortOption)
+      if (freeOnly) params.set('free_only', 'true')
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/marketplace?${params.toString()}`)
 
       if (response.ok) {
@@ -330,6 +334,37 @@ export default function MarketplacePage() {
     }
   }
 
+  const loadTopAgents = async () => {
+    try {
+      const params = new URLSearchParams()
+      if (freeOnly) params.set('free_only', 'true')
+      const resp = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/marketplace/top?${params.toString()}`)
+      if (resp.ok) {
+        const data = await resp.json()
+        if (data.agents && data.agents.length > 0) {
+          const mapped = data.agents.map((a: any) => ({
+            id: a.id,
+            name: a.name,
+            description: a.description,
+            category: a.category || 'general',
+            rating: typeof a.average_rating === 'number' ? a.average_rating : 0,
+            usage_count: typeof a.total_calls === 'number' ? a.total_calls : 0,
+            is_featured: !!a.is_featured,
+            price: a.is_free ? 0 : (a.cost_per_request ?? 0),
+            trust_score: typeof a.trust_score === 'number' ? a.trust_score : undefined,
+            trust_grade: a.trust_grade as string | undefined,
+          })) as Agent[]
+          setTopAgents(mapped)
+        } else {
+          setTopAgents([])
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load top agents', e)
+      setTopAgents([])
+    }
+  }
+
   const handleCategoryClick = (category: string) => {
     setSelectedCategory(category)
     setCategories(prev => prev.map(cat => ({
@@ -392,8 +427,32 @@ export default function MarketplacePage() {
                     {cat.name}
                   </button>
                 ))}
+                <button
+                  onClick={() => setFreeOnly((v) => !v)}
+                  className={`flex h-9 shrink-0 items-center justify-center gap-x-2 rounded-full border px-4 text-sm font-medium transition-colors ${
+                    freeOnly
+                      ? "border-primary bg-primary/20 text-primary hover:bg-primary/30"
+                      : "border-white/10 bg-white/5 text-[#E0E0E0] hover:border-primary hover:bg-primary/20 hover:text-primary"
+                  }`}
+                >
+                  Free only
+                </button>
               </div>
             </section>
+
+            {topAgents.length > 0 && (
+              <section className="mt-16">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold font-mono tracking-tight text-[#E0E0E0]">Top Agents</h2>
+                  <div className="text-xs text-[#E0E0E0]/60">Ranked by trust, rating, and usage</div>
+                </div>
+                <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                  {topAgents.slice(0, 8).map((agent) => (
+                    <AgentCard key={agent.id} agent={agent} />
+                  ))}
+                </div>
+              </section>
+            )}
 
             <section className="mt-20">
               <h2 className="text-2xl font-bold font-mono tracking-tight text-[#E0E0E0]">Featured Agents</h2>

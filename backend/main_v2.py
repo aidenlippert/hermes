@@ -760,10 +760,15 @@ async def list_agents(
     limit: int = 50,
     category: Optional[str] = None,
     sort: Optional[str] = None,  # trust|rating|usage
+    free_only: Optional[bool] = None,
     db: AsyncSession = Depends(get_db)
 ):
     """List all active agents with optional sorting and trust score enrichment"""
     agents = await AgentRegistry.list_agents(db, skip, limit, category, sort=sort or "rating")
+
+    # Apply free_only filter in memory (AgentRegistry can be extended later)
+    if free_only is True:
+        agents = [a for a in agents if bool(a.is_free)]
 
     # Enrich with trust scores
     from sqlalchemy import select
@@ -817,6 +822,101 @@ async def list_agents(
             for agent in agents
         ],
         "total": len(agents)
+    }
+
+
+@app.get("/api/v1/marketplace/top")
+async def top_agents(
+    limit: int = 8,
+    category: Optional[str] = None,
+    free_only: Optional[bool] = None,
+    db: AsyncSession = Depends(get_db)
+):
+    """Return top agents ranked by a composite score of trust, rating, and usage.
+
+    score = 0.6 * trust + 0.25 * rating_norm + 0.15 * usage_norm
+    where rating_norm is average_rating/5 and usage_norm is total_calls/max_total_calls among candidates.
+    """
+    # Get a reasonable candidate set
+    candidates = await AgentRegistry.list_agents(db, skip=0, limit=200, category=category, sort="trust")
+
+    # Filter
+    if free_only is True:
+        candidates = [a for a in candidates if bool(a.is_free)]
+
+    # Build trust map
+    from sqlalchemy import select
+    from backend.database.models import AgentTrustScore
+    ids = [str(a.id) for a in candidates]
+    trust_map: dict[str, float] = {}
+    if ids:
+        result = await db.execute(
+            select(AgentTrustScore.agent_id, AgentTrustScore.trust_score)
+            .where(AgentTrustScore.agent_id.in_(ids))
+        )
+        trust_map = {str(row[0]): float(row[1]) for row in result.all() if row[1] is not None}
+
+    # Compute score
+    max_usage = max((a.total_calls or 0) for a in candidates) if candidates else 0
+    def usage_norm(a):
+        return ((a.total_calls or 0) / max_usage) if max_usage > 0 else 0.0
+
+    def rating_norm(a):
+        return (float(a.average_rating) / 5.0) if a.average_rating else 0.0
+
+    def trust(a):
+        return trust_map.get(str(a.id), 0.0)
+
+    scored = [
+        (
+            0.60 * trust(a) + 0.25 * rating_norm(a) + 0.15 * usage_norm(a),
+            a,
+        )
+        for a in candidates
+    ]
+    scored.sort(key=lambda x: x[0], reverse=True)
+    top = [a for _, a in scored[:limit]]
+
+    def _trust_grade(score: float) -> str:
+        if score >= 0.95:
+            return "A+"
+        elif score >= 0.90:
+            return "A"
+        elif score >= 0.85:
+            return "A-"
+        elif score >= 0.80:
+            return "B+"
+        elif score >= 0.75:
+            return "B"
+        elif score >= 0.70:
+            return "B-"
+        elif score >= 0.65:
+            return "C+"
+        elif score >= 0.60:
+            return "C"
+        elif score >= 0.55:
+            return "C-"
+        else:
+            return "D"
+
+    return {
+        "agents": [
+            {
+                "id": a.id,
+                "name": a.name,
+                "description": a.description,
+                "category": a.category,
+                "capabilities": a.capabilities,
+                "average_rating": a.average_rating,
+                "total_calls": a.total_calls,
+                "is_free": a.is_free,
+                "cost_per_request": a.cost_per_request,
+                "trust_score": trust(a),
+                "trust_grade": _trust_grade(trust(a)),
+            }
+            for a in top
+        ],
+        "total": len(top)
     }
 
 
