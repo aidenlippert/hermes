@@ -19,29 +19,54 @@ depends_on = None
 
 def upgrade() -> None:
     # Add all missing columns to agents table to match the Agent model
+    # Create enum type idempotently
     op.execute("DO $$ BEGIN CREATE TYPE agentstatus AS ENUM ('pending_review', 'active', 'suspended', 'deprecated'); EXCEPTION WHEN duplicate_object THEN null; END $$;")
-    
-    op.add_column('agents', sa.Column('version', sa.String(), server_default='1.0.0', nullable=True))
-    op.add_column('agents', sa.Column('tags', postgresql.JSON(), server_default='[]', nullable=True))
-    op.add_column('agents', sa.Column('description_embedding', postgresql.JSON(), nullable=True))
-    op.add_column('agents', sa.Column('successful_calls', sa.Integer(), server_default='0', nullable=True))
-    op.add_column('agents', sa.Column('failed_calls', sa.Integer(), server_default='0', nullable=True))
-    op.add_column('agents', sa.Column('average_duration', sa.Float(), server_default='0.0', nullable=True))
-    op.add_column('agents', sa.Column('status', postgresql.ENUM('pending_review', 'active', 'suspended', 'deprecated', name='agentstatus', create_type=False), server_default='pending_review', nullable=True))
-    op.add_column('agents', sa.Column('is_featured', sa.Boolean(), server_default='false', nullable=True))
-    op.add_column('agents', sa.Column('is_verified', sa.Boolean(), server_default='false', nullable=True))
-    op.add_column('agents', sa.Column('agent_card', postgresql.JSON(), nullable=True))
-    op.add_column('agents', sa.Column('creator_id', sa.String(), nullable=True))
-    op.add_column('agents', sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True))
-    op.add_column('agents', sa.Column('last_called', sa.DateTime(timezone=True), nullable=True))
-    
-    # Rename columns to match model
-    op.execute("ALTER TABLE agents RENAME COLUMN owner_id TO creator_id_temp")
-    op.execute("UPDATE agents SET creator_id = creator_id_temp")
-    op.execute("ALTER TABLE agents DROP COLUMN creator_id_temp")
-    op.execute("ALTER TABLE agents RENAME COLUMN average_response_time TO average_duration_temp")
-    op.execute("UPDATE agents SET average_duration = average_duration_temp")
-    op.execute("ALTER TABLE agents DROP COLUMN average_duration_temp")
+
+    # Add columns idempotently (will skip if they already exist)
+    op.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS version VARCHAR DEFAULT '1.0.0'")
+    op.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS tags JSONB DEFAULT '[]'::jsonb")
+    op.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS description_embedding JSONB")
+    op.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS successful_calls INTEGER DEFAULT 0")
+    op.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS failed_calls INTEGER DEFAULT 0")
+    op.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS average_duration DOUBLE PRECISION DEFAULT 0.0")
+    op.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS status agentstatus DEFAULT 'pending_review'")
+    op.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS is_featured BOOLEAN DEFAULT false")
+    op.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT false")
+    op.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS agent_card JSONB")
+    op.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS creator_id VARCHAR")
+    op.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ")
+    op.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS last_called TIMESTAMPTZ")
+
+    # Migrate/rename legacy columns safely
+    # Move owner_id -> creator_id then drop owner_id if it exists
+    op.execute("""
+    DO $$
+    BEGIN
+        IF EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name='agents' AND column_name='owner_id'
+        ) THEN
+            EXECUTE 'UPDATE agents SET creator_id = COALESCE(creator_id, owner_id)';
+            EXECUTE 'ALTER TABLE agents DROP COLUMN owner_id';
+        END IF;
+    END$$;
+    """)
+
+    # Move average_response_time -> average_duration then drop average_response_time if it exists
+    op.execute("""
+    DO $$
+    BEGIN
+        IF EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name='agents' AND column_name='average_response_time'
+        ) THEN
+            EXECUTE 'UPDATE agents SET average_duration = COALESCE(average_duration, average_response_time)';
+            EXECUTE 'ALTER TABLE agents DROP COLUMN average_response_time';
+        END IF;
+    END$$;
+    """)
+
+    # Clean up deprecated columns if they exist
     op.execute("ALTER TABLE agents DROP COLUMN IF EXISTS api_key")
     op.execute("ALTER TABLE agents DROP COLUMN IF EXISTS is_active")
     op.execute("ALTER TABLE agents DROP COLUMN IF EXISTS last_active")
