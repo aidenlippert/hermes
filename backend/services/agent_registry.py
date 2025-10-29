@@ -9,6 +9,7 @@ from typing import List, Optional, Dict, Any
 from sqlalchemy import select, func, or_, String
 from sqlalchemy.ext.asyncio import AsyncSession
 import google.generativeai as genai
+import asyncio
 import os
 
 from backend.database.models import Agent, AgentStatus, AgentRating
@@ -16,9 +17,19 @@ from backend.database.connection import Cache
 
 logger = logging.getLogger(__name__)
 
-# Configure Gemini for embeddings
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "AIzaSyAOceA7tUW7cPenJol4pyOcNyTBpa_a5cg")
-genai.configure(api_key=GOOGLE_API_KEY)
+# Embedding configuration
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+DISABLE_EMBEDDINGS = os.getenv("DISABLE_EMBEDDINGS", "false").lower() == "true"
+EMBED_MAX_RETRIES = int(os.getenv("EMBED_MAX_RETRIES", "3"))
+EMBED_BACKOFF_SECONDS = float(os.getenv("EMBED_BACKOFF_SECONDS", "1.5"))
+
+if GOOGLE_API_KEY and not DISABLE_EMBEDDINGS:
+    genai.configure(api_key=GOOGLE_API_KEY)
+else:
+    if not GOOGLE_API_KEY and not DISABLE_EMBEDDINGS:
+        # No API key provided; disable embeddings to avoid noisy failures
+        DISABLE_EMBEDDINGS = True
+        logger.warning("Embeddings disabled: missing GOOGLE_API_KEY. Set DISABLE_EMBEDDINGS=false and provide a key to enable.")
 
 
 class AgentRegistry:
@@ -44,19 +55,28 @@ class AgentRegistry:
         Returns:
             List of floats (1536 dimensions)
         """
-        try:
-            # Use Gemini's embedding model
-            result = genai.embed_content(
-                model="models/embedding-001",
-                content=text,
-                task_type="retrieval_document"
-            )
-            return result['embedding']
-
-        except Exception as e:
-            logger.error(f"❌ Embedding creation failed: {e}")
-            # Return zero vector as fallback
+        # Short-circuit if disabled
+        if DISABLE_EMBEDDINGS:
             return [0.0] * 768  # embedding-001 is 768 dimensions
+
+        last_err: Optional[Exception] = None
+        for attempt in range(1, EMBED_MAX_RETRIES + 1):
+            try:
+                # Use Gemini's embedding model
+                result = genai.embed_content(
+                    model="models/embedding-001",
+                    content=text,
+                    task_type="retrieval_document"
+                )
+                return result['embedding']
+            except Exception as e:
+                last_err = e
+                # Exponential backoff on transient errors
+                await asyncio.sleep(EMBED_BACKOFF_SECONDS * (2 ** (attempt - 1)))
+
+        logger.error(f"❌ Embedding creation failed after retries: {last_err}")
+        # Return zero vector as fallback
+        return [0.0] * 768  # embedding-001 is 768 dimensions
 
 
     @staticmethod
