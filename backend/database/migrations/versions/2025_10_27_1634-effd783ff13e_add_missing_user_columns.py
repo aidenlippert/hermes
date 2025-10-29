@@ -1,7 +1,7 @@
 """add_missing_user_columns
 
 Revision ID: effd783ff13e
-Revises: 6bf111ac0804
+Revises: mesh_protocol_v1
 Create Date: 2025-10-27 16:34:01.161192
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = 'effd783ff13e'
-down_revision = '6bf111ac0804'
+down_revision = 'mesh_protocol_v1'
 branch_labels = None
 depends_on = None
 
