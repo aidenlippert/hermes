@@ -12,7 +12,7 @@ import google.generativeai as genai
 import asyncio
 import os
 
-from backend.database.models import Agent, AgentStatus, AgentRating
+from backend.database.models import Agent, AgentStatus, AgentRating, AgentTrustScore
 from backend.database.connection import Cache
 
 logger = logging.getLogger(__name__)
@@ -286,7 +286,8 @@ class AgentRegistry:
         skip: int = 0,
         limit: int = 50,
         category: Optional[str] = None,
-        status: AgentStatus = AgentStatus.ACTIVE
+        status: AgentStatus = AgentStatus.ACTIVE,
+        sort: str = "rating"  # rating|usage|trust
     ) -> List[Agent]:
         """
         List all agents with pagination.
@@ -306,7 +307,17 @@ class AgentRegistry:
         if category:
             stmt = stmt.where(Agent.category == category)
 
-        stmt = stmt.order_by(Agent.average_rating.desc(), Agent.total_calls.desc())
+        # Sorting
+        sort_key = (sort or "rating").lower()
+        if sort_key == "usage":
+            stmt = stmt.order_by(Agent.total_calls.desc(), Agent.average_rating.desc())
+        elif sort_key == "trust":
+            stmt = (
+                stmt.outerjoin(AgentTrustScore, AgentTrustScore.agent_id == Agent.id)
+                .order_by(func.coalesce(AgentTrustScore.trust_score, 0.0).desc(), Agent.average_rating.desc())
+            )
+        else:
+            stmt = stmt.order_by(Agent.average_rating.desc(), Agent.total_calls.desc())
         stmt = stmt.offset(skip).limit(limit)
 
         result = await db.execute(stmt)

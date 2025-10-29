@@ -759,10 +759,45 @@ async def list_agents(
     skip: int = 0,
     limit: int = 50,
     category: Optional[str] = None,
+    sort: Optional[str] = None,  # trust|rating|usage
     db: AsyncSession = Depends(get_db)
 ):
-    """List all active agents"""
-    agents = await AgentRegistry.list_agents(db, skip, limit, category)
+    """List all active agents with optional sorting and trust score enrichment"""
+    agents = await AgentRegistry.list_agents(db, skip, limit, category, sort=sort or "rating")
+
+    # Enrich with trust scores
+    from sqlalchemy import select
+    from backend.database.models import AgentTrustScore
+    agent_ids = [str(a.id) for a in agents]
+    trust_map: dict[str, float] = {}
+    if agent_ids:
+        result = await db.execute(
+            select(AgentTrustScore.agent_id, AgentTrustScore.trust_score)
+            .where(AgentTrustScore.agent_id.in_(agent_ids))
+        )
+        trust_map = {str(row[0]): float(row[1]) for row in result.all() if row[1] is not None}
+
+    def _trust_grade(score: float) -> str:
+        if score >= 0.95:
+            return "A+"
+        elif score >= 0.90:
+            return "A"
+        elif score >= 0.85:
+            return "A-"
+        elif score >= 0.80:
+            return "B+"
+        elif score >= 0.75:
+            return "B"
+        elif score >= 0.70:
+            return "B-"
+        elif score >= 0.65:
+            return "C+"
+        elif score >= 0.60:
+            return "C"
+        elif score >= 0.55:
+            return "C-"
+        else:
+            return "D"
 
     return {
         "agents": [
@@ -775,7 +810,9 @@ async def list_agents(
                 "average_rating": agent.average_rating,
                 "total_calls": agent.total_calls,
                 "is_free": agent.is_free,
-                "cost_per_request": agent.cost_per_request
+                "cost_per_request": agent.cost_per_request,
+                "trust_score": trust_map.get(str(agent.id), 0.0),
+                "trust_grade": _trust_grade(trust_map.get(str(agent.id), 0.0)),
             }
             for agent in agents
         ],

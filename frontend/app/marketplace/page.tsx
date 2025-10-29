@@ -139,6 +139,8 @@ interface Agent {
   is_featured?: boolean
   price?: number
   creator?: any
+  trust_score?: number
+  trust_grade?: string
 }
 
 const StarRating = ({ rating, reviews }: { rating: number; reviews: number }) => {
@@ -171,6 +173,11 @@ const AgentCard = ({ agent }: { agent: Agent }) => {
             <Icon className="text-3xl text-primary" />
           </div>
           <h3 className="font-mono text-lg font-bold text-[#E0E0E0]">{agent.name}</h3>
+          {agent.trust_grade && (
+            <span className="ml-auto rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs text-primary">
+              Trust {agent.trust_grade}
+            </span>
+          )}
         </div>
         <p className="mt-4 text-sm text-[#E0E0E0]/70">{agent.description}</p>
         <div className="mt-4 flex items-center justify-between">
@@ -236,6 +243,7 @@ export default function MarketplacePage() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("all")
+  const [sortOption, setSortOption] = useState<'trust' | 'rating' | 'usage'>('trust')
   const accessToken = useAuthStore((state) => state.accessToken)
   const [categories, setCategories] = useState([
     { name: "All", value: "all", active: true },
@@ -248,13 +256,15 @@ export default function MarketplacePage() {
 
   useEffect(() => {
     loadAgents()
-  }, [])
+  }, [sortOption])
 
   const loadAgents = async () => {
     setLoading(true)
     try {
       // Fetch agents from backend (v2 endpoint)
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/marketplace`)
+      const params = new URLSearchParams()
+      if (sortOption) params.set('sort', sortOption)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/marketplace?${params.toString()}`)
 
       if (response.ok) {
         const data = await response.json()
@@ -268,7 +278,9 @@ export default function MarketplacePage() {
             rating: typeof a.average_rating === 'number' ? a.average_rating : 0,
             usage_count: typeof a.total_calls === 'number' ? a.total_calls : 0,
             is_featured: !!a.is_featured,
-            price: a.is_free ? 0 : (a.cost_per_request ?? 0)
+            price: a.is_free ? 0 : (a.cost_per_request ?? 0),
+            trust_score: typeof a.trust_score === 'number' ? a.trust_score : undefined,
+            trust_grade: a.trust_grade as string | undefined,
           })) as Agent[]
 
           setAgents(mappedAgents)
@@ -385,6 +397,18 @@ export default function MarketplacePage() {
 
             <section className="mt-20">
               <h2 className="text-2xl font-bold font-mono tracking-tight text-[#E0E0E0]">Featured Agents</h2>
+              <div className="mt-3 flex items-center justify-end gap-2">
+                <label className="text-xs text-[#E0E0E0]/60">Sort by</label>
+                <select
+                  value={sortOption}
+                  onChange={(e) => setSortOption(e.target.value as 'trust' | 'rating' | 'usage')}
+                  className="rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs text-[#E0E0E0] focus:border-primary focus:outline-none"
+                >
+                  <option value="trust">Trust</option>
+                  <option value="rating">Rating</option>
+                  <option value="usage">Usage</option>
+                </select>
+              </div>
               {loading ? (
                 <div className="mt-6 flex items-center justify-center py-12">
                   <Loader2 className="w-8 h-8 animate-spin text-primary" />
