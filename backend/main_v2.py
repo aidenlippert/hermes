@@ -80,10 +80,12 @@ from backend.api import marketplace
 from backend.api import a2a
 from backend.api import orgs
 from backend.api import federation
+from backend.api.v1 import workflows as workflows_api
 app.include_router(marketplace.router)
 app.include_router(a2a.router)
 app.include_router(orgs.router)
 app.include_router(federation.router)
+app.include_router(workflows_api.router, prefix="/api/v1", tags=["Workflows"])
 
 # Security
 security = HTTPBearer()
