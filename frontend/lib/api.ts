@@ -81,6 +81,18 @@ export const api = {
       return response.data;
     },
 
+    async approve(
+      request: { task_id: string; conversation_id: string; approved?: boolean; extracted_info?: any },
+      token: string
+    ) {
+      const response = await axios.post<ChatResponse>(
+        `${API_URL}/api/v1/chat/approve`,
+        { approved: true, ...request },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      return response.data;
+    },
+
     async history(token: string) {
       try {
         const response = await axios.get(
