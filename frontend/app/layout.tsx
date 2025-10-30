@@ -5,8 +5,9 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "Hermes - AI Agent Orchestration Platform",
-  description: "The Operating System for AI Agent Coordination. Natural language to multi-agent workflows.",
+  title: "Astraeus — The Agent Internet",
+  description:
+    "Orchestrate any AI agent with discovery, approvals, and governance. Open protocol. Production‑ready.",
 };
 
 export default function RootLayout({

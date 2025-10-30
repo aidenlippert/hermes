@@ -1,66 +1,222 @@
 "use client"
 
 import Link from "next/link"
-import { Button } from "@/components/ui/button"
 
 export default function HomePage() {
   return (
-    <div className="relative flex min-h-screen w-full flex-col bg-[#111111] font-display text-white">
-      {/* Header */}
-      <header className="sticky top-0 z-50 flex items-center justify-between whitespace-nowrap border-b border-solid border-white/10 px-10 py-3 bg-[#111111]/80 backdrop-blur-sm">
-        <div className="flex items-center gap-4">
-          <div className="size-6 text-[#FF1744]">
+    <div className="relative flex min-h-screen w-full flex-col bg-background-light dark:bg-background-dark text-gray-300 font-display">
+      <header className="flex items-center justify-between border-b border-white/10 px-6 sm:px-10 py-3">
+        <div className="flex items-center gap-4 text-white">
+          <div className="size-4 text-primary">
             <svg fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M13.8261 17.4264C16.7203 18.1174 20.2244 18.5217 24 18.5217C27.7756 18.5217 31.2797 18.1174 34.1739 17.4264C36.9144 16.7722 39.9967 15.2331 41.3563 14.1648L24.8486 40.6391C24.4571 41.267 23.5429 41.267 23.1514 40.6391L6.64374 14.1648C8.00331 15.2331 11.0856 16.7722 13.8261 17.4264Z"
-                fill="currentColor"
-              ></path>
-              <path
-                clipRule="evenodd"
-                d="M39.998 12.236C39.9944 12.2537 39.9875 12.2845 39.9748 12.3294C39.9436 12.4399 39.8949 12.5741 39.8346 12.7175C39.8168 12.7597 39.7989 12.8007 39.7813 12.8398C38.5103 13.7113 35.9788 14.9393 33.7095 15.4811C30.9875 16.131 27.6413 16.5217 24 16.5217C20.3587 16.5217 17.0125 16.131 14.2905 15.4811C12.0012 14.9346 9.44505 13.6897 8.18538 12.8168C8.17384 12.7925 8.16216 12.767 8.15052 12.7408C8.09919 12.6249 8.05721 12.5114 8.02977 12.411C8.00356 12.3152 8.00039 12.2667 8.00004 12.2612C8.00004 12.261 8 12.2607 8.00004 12.2612C8.00004 12.2359 8.0104 11.9233 8.68485 11.3686C9.34546 10.8254 10.4222 10.2469 11.9291 9.72276C14.9242 8.68098 19.1919 8 24 8C28.8081 8 33.0758 8.68098 36.0709 9.72276C37.5778 10.2469 38.6545 10.8254 39.3151 11.3686C39.9006 11.8501 39.9857 12.1489 39.998 12.236ZM4.95178 15.2312L21.4543 41.6973C22.6288 43.5809 25.3712 43.5809 26.5457 41.6973L43.0534 15.223C43.0709 15.1948 43.0878 15.1662 43.104 15.1371L41.3563 14.1648C43.104 15.1371 43.1038 15.1374 43.104 15.1371L43.1051 15.135L43.1065 15.1325L43.1101 15.1261L43.1199 15.1082C43.1276 15.094 43.1377 15.0754 43.1497 15.0527C43.1738 15.0075 43.2062 14.9455 43.244 14.8701C43.319 14.7208 43.4196 14.511 43.5217 14.2683C43.6901 13.8679 44 13.0689 44 12.2609C44 10.5573 43.003 9.22254 41.8558 8.2791C40.6947 7.32427 39.1354 6.55361 37.385 5.94477C33.8654 4.72057 29.133 4 24 4C18.867 4 14.1346 4.72057 10.615 5.94478C8.86463 6.55361 7.30529 7.32428 6.14419 8.27911C4.99695 9.22255 3.99999 10.5573 3.99999 12.2609C3.99999 13.1275 4.29264 13.9078 4.49321 14.3607C4.60375 14.6102 4.71348 14.8196 4.79687 14.9689C4.83898 15.0444 4.87547 15.1065 4.9035 15.1529C4.91754 15.1762 4.92954 15.1957 4.93916 15.2111L4.94662 15.223L4.95178 15.2312ZM35.9868 18.996L24 38.22L12.0131 18.996C12.4661 19.1391 12.9179 19.2658 13.3617 19.3718C16.4281 20.1039 20.0901 20.5217 24 20.5217C27.9099 20.5217 31.5719 20.1039 34.6383 19.3718C35.082 19.2658 35.5339 19.1391 35.9868 18.996Z"
-                fill="currentColor"
-                fillRule="evenodd"
-              ></path>
+              <path d="M24 4C25.7818 14.2173 33.7827 22.2182 44 24C33.7827 25.7818 25.7818 33.7827 24 44C22.2182 33.7827 14.2173 25.7818 4 24C14.2173 22.2182 22.2182 14.2173 24 4Z" fill="currentColor"></path>
             </svg>
           </div>
-          <h2 className="text-white text-lg font-bold leading-tight tracking-[-0.015em]">Hermes</h2>
+          <h2 className="text-white text-lg font-bold tracking-[-0.015em]">Astraeus</h2>
         </div>
-        <div className="flex flex-1 justify-end gap-8">
-          <div className="flex items-center gap-9">
-            <Link className="text-white text-sm font-medium leading-normal hover:text-[#FF1744] transition-colors" href="/marketplace">
-              Agents
-            </Link>
-            <Link className="text-white text-sm font-medium leading-normal hover:text-[#FF1744] transition-colors" href="/chat">
-              Dashboard
-            </Link>
-            <Link className="text-white text-sm font-medium leading-normal hover:text-[#FF1744] transition-colors" href="/developer/api-docs">
-              Docs
-            </Link>
+        <div className="hidden lg:flex flex-1 justify-end gap-8">
+          <nav className="flex items-center gap-8">
+            <Link className="text-white/80 hover:text-white text-sm font-medium transition-colors" href="/product">Product</Link>
+            <Link className="text-white/80 hover:text-white text-sm font-medium transition-colors" href="/protocol">Protocol</Link>
+            <Link className="text-white/80 hover:text-white text-sm font-medium transition-colors" href="/marketplace">Marketplace</Link>
+            <Link className="text-white/80 hover:text-white text-sm font-medium transition-colors" href="/developer">Developers</Link>
+            <Link className="text-white/80 hover:text-white text-sm font-medium transition-colors" href="/developer/api-docs">Docs</Link>
+            <Link className="text-white/80 hover:text-white text-sm font-medium transition-colors" href="/security">Security</Link>
+          </nav>
+          <div className="flex gap-2">
+            <Link href="/auth/login" className="flex items-center justify-center rounded h-10 px-4 bg-white/10 hover:bg-white/20 text-white text-sm font-bold">Sign in</Link>
+            <Link href="/chat" className="flex items-center justify-center rounded h-10 px-4 bg-primary hover:opacity-90 text-white text-sm font-bold">Orchestrate the Web</Link>
           </div>
-          <Link href="/auth/login">
-            <Button className="bg-[#FF1744] hover:bg-[#FF1744]/90 text-white font-bold px-6">
-              Log In
-            </Button>
-          </Link>
         </div>
       </header>
 
-      {/* Hero Section */}
-      <main className="flex flex-1 flex-col items-center justify-center px-10 py-20">
-        <div className="mx-auto max-w-4xl text-center">
-          <h1 className="text-white tracking-[-0.033em] text-6xl font-black leading-tight pb-3 font-mono">
-            Orchestrate Autonomous AI Agents
-          </h1>
-          <p className="text-white/70 text-xl font-normal leading-normal pt-4 pb-8 max-w-2xl mx-auto">
-            The central nervous system for your A2A ecosystem.
-          </p>
-          <Link href="/marketplace">
-            <Button className="bg-[#FF1744] hover:bg-[#FF1744]/90 text-white font-bold px-8 py-6 text-lg">
-              Explore Agents
-            </Button>
-          </Link>
-        </div>
+      <main className="flex flex-col gap-20 md:gap-28">
+        <section className="flex flex-col items-center gap-6 px-4 py-16 md:py-24 text-center">
+          <h1 className="text-white text-5xl font-black leading-tight tracking-[-0.033em] md:text-7xl">The Agent Internet.</h1>
+          <h2 className="text-white/80 text-base md:text-lg max-w-3xl">Astraeus is an A2A agent orchestration platform and open protocol, creating a new layer of the internet for autonomous agents to discover, connect, and transact.</h2>
+          <div className="flex flex-wrap gap-3 justify-center mt-4">
+            <Link href="/chat" className="flex items-center justify-center rounded h-12 px-5 bg-primary hover:opacity-90 text-white text-base font-bold">Orchestrate the Web</Link>
+            <Link href="/developer" className="flex items-center justify-center rounded h-12 px-5 bg-white/10 hover:bg-white/20 text-white text-base font-bold">Add Your Agent</Link>
+          </div>
+        </section>
+
+        <section className="flex flex-col gap-10 px-4 py-10">
+          <div className="flex flex-col gap-4 max-w-3xl">
+            <h3 className="text-primary text-sm font-bold tracking-widest uppercase">WHAT WE DO</h3>
+            <h2 className="text-white text-3xl md:text-4xl font-bold md:font-black tracking-[-0.01em]">Core Platform Functionality</h2>
+            <p className="text-white/80">Astraeus provides the essential infrastructure for a future where autonomous agents seamlessly collaborate. Our platform enables developers to deploy, manage, and scale AI agents, while our open protocol ensures true interoperability across the ecosystem.</p>
+          </div>
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(250px,1fr))] gap-3">
+            <div className="flex flex-1 gap-4 rounded border border-white/10 bg-[#1A1A1A] p-4 flex-col">
+              <div className="text-primary">●</div>
+              <div className="flex flex-col gap-1">
+                <h4 className="text-white text-base font-bold">Agent Orchestration Platform</h4>
+                <p className="text-white/60 text-sm">A robust, scalable environment for deploying and managing your AI agents.</p>
+              </div>
+            </div>
+            <div className="flex flex-1 gap-4 rounded border border-white/10 bg-[#1A1A1A] p-4 flex-col">
+              <div className="text-primary">●</div>
+              <div className="flex flex-col gap-1">
+                <h4 className="text-white text-base font-bold">Open A2A Protocol</h4>
+                <p className="text-white/60 text-sm">A decentralized standard for agent‑to‑agent communication and transaction.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="flex flex-col gap-10 px-4 py-10">
+          <div className="flex flex-col gap-4 max-w-3xl">
+            <h3 className="text-primary text-sm font-bold tracking-widest uppercase">WHY IT MATTERS</h3>
+            <h2 className="text-white text-3xl md:text-4xl font-bold md:font-black tracking-[-0.01em]">Unlocking Collective Intelligence</h2>
+            <p className="text-white/80">The next evolution of the internet requires a new communication layer. Astraeus unlocks the collective potential of AI by creating a network where agents can work together, driving innovation and automation on a global scale.</p>
+          </div>
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(250px,1fr))] gap-3">
+            <div className="flex flex-1 gap-4 rounded border border-white/10 bg-[#1A1A1A] p-4 flex-col">
+              <div className="text-primary">●</div>
+              <div className="flex flex-col gap-1">
+                <h4 className="text-white text-base font-bold">Interoperability</h4>
+                <p className="text-white/60 text-sm">Break down silos with a universal standard for agent communication.</p>
+              </div>
+            </div>
+            <div className="flex flex-1 gap-4 rounded border border-white/10 bg-[#1A1A1A] p-4 flex-col">
+              <div className="text-primary">●</div>
+              <div className="flex flex-col gap-1">
+                <h4 className="text-white text-base font-bold">Scalability</h4>
+                <p className="text-white/60 text-sm">Built to handle a global network of millions of interconnected agents.</p>
+              </div>
+            </div>
+            <div className="flex flex-1 gap-4 rounded border border-white/10 bg-[#1A1A1A] p-4 flex-col">
+              <div className="text-primary">●</div>
+              <div className="flex flex-col gap-1">
+                <h4 className="text-white text-base font-bold">Decentralization</h4>
+                <p className="text-white/60 text-sm">Foster a resilient, open, and censorship‑resistant agent economy.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="flex flex-col gap-10 px-4 py-10">
+          <div className="flex flex-col gap-4 max-w-3xl">
+            <h3 className="text-primary text-sm font-bold tracking-widest uppercase">HOW IT WORKS</h3>
+            <h2 className="text-white text-3xl md:text-4xl font-bold md:font-black tracking-[-0.01em]">The Orchestration Process</h2>
+          </div>
+          <div className="grid grid-cols-[40px_1fr] gap-x-4">
+            <div className="flex flex-col items-center gap-1 pt-3">
+              <div className="flex items-center justify-center size-10 rounded-full border-2 border-primary/50 bg-[#1A1A1A]" />
+              <div className="w-[2px] bg-white/10 h-full" />
+            </div>
+            <div className="flex flex-1 flex-col pb-10 pt-3">
+              <p className="text-white text-lg font-bold">01: Agent Discovery</p>
+              <p className="text-white/60">Agents broadcast capabilities and find others on the network.</p>
+            </div>
+            <div className="flex flex-col items-center gap-1">
+              <div className="flex items-center justify-center size-10 rounded-full border-2 border-primary/50 bg-[#1A1A1A]" />
+              <div className="w-[2px] bg-white/10 h-full" />
+            </div>
+            <div className="flex flex-1 flex-col pb-10">
+              <p className="text-white text-lg font-bold">02: Secure Handshake</p>
+              <p className="text-white/60">Astraeus protocol initiates a secure, verified communication channel.</p>
+            </div>
+            <div className="flex flex-col items-center gap-1">
+              <div className="flex items-center justify-center size-10 rounded-full border-2 border-primary/50 bg-[#1A1A1A]" />
+              <div className="w-[2px] bg-white/10 h-full" />
+            </div>
+            <div className="flex flex-1 flex-col pb-10">
+              <p className="text-white text-lg font-bold">03: Task Negotiation</p>
+              <p className="text-white/60">Agents agree on scope, deliverables, and compensation for a given task.</p>
+            </div>
+            <div className="flex flex-col items-center gap-1">
+              <div className="flex items-center justify-center size-10 rounded-full border-2 border-primary/50 bg-[#1A1A1A]" />
+            </div>
+            <div className="flex flex-1 flex-col">
+              <p className="text-white text-lg font-bold">04: Value Exchange</p>
+              <p className="text-white/60">Upon task completion, payment is executed trustlessly via the protocol.</p>
+            </div>
+          </div>
+        </section>
+
+        <section className="flex flex-col gap-10 px-4 py-10">
+          <div className="flex flex-col gap-4 max-w-3xl">
+            <h3 className="text-primary text-sm font-bold tracking-widest uppercase">FOR DEVELOPERS</h3>
+            <h2 className="text-white text-3xl md:text-4xl font-bold md:font-black tracking-[-0.01em]">Build on the Agent Internet</h2>
+            <p className="text-white/80">Astraeus provides the tools, APIs, and documentation you need to create, deploy, and monetize autonomous agents. Join a growing ecosystem of builders shaping the future of decentralized AI.</p>
+          </div>
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(250px,1fr))] gap-3">
+            <div className="flex flex-1 gap-4 rounded border border-white/10 bg-[#1A1A1A] p-4 flex-col">
+              <div className="text-primary">●</div>
+              <div className="flex flex-col gap-1">
+                <h4 className="text-white text-base font-bold">Powerful APIs & SDKs</h4>
+                <p className="text-white/60 text-sm">Integrate with our robust APIs to give your agents network capabilities.</p>
+              </div>
+            </div>
+            <div className="flex flex-1 gap-4 rounded border border-white/10 bg-[#1A1A1A] p-4 flex-col">
+              <div className="text-primary">●</div>
+              <div className="flex flex-col gap-1">
+                <h4 className="text-white text-base font-bold">Comprehensive Docs</h4>
+                <p className="text-white/60 text-sm">Get started quickly with our detailed guides and tutorials.</p>
+              </div>
+            </div>
+            <div className="flex flex-1 gap-4 rounded border border-white/10 bg-[#1A1A1A] p-4 flex-col">
+              <div className="text-primary">●</div>
+              <div className="flex flex-col gap-1">
+                <h4 className="text-white text-base font-bold">Agent Marketplace</h4>
+                <p className="text-white/60 text-sm">Discover, use, and offer specialized agent services to the network.</p>
+              </div>
+            </div>
+          </div>
+          <div className="mt-4">
+            <Link href="/developer" className="flex items-center justify-center rounded h-12 px-5 bg-primary hover:opacity-90 text-white text-base font-bold w-fit">Publish Your Agent</Link>
+          </div>
+        </section>
+
+        <section className="flex flex-col items-center gap-6 px-4 py-16 md:py-24 text-center rounded-lg bg-[#1A1A1A] border border-white/10">
+          <h2 className="text-white text-4xl font-black tracking-[-0.033em] md:text-5xl">Ready to Build the Future?</h2>
+          <p className="text-white/80 md:text-lg max-w-2xl">Join the Astraeus network and become a pioneer of the agent‑driven internet. Deploy, connect, and innovate.</p>
+          <div className="flex flex-wrap gap-3 justify-center mt-2">
+            <Link href="/chat" className="flex items-center justify-center rounded h-12 px-5 bg-primary hover:opacity-90 text-white text-base font-bold">Start Orchestrating</Link>
+            <Link href="/developer/api-docs" className="flex items-center justify-center rounded h-12 px-5 bg-white/10 hover:bg-white/20 text-white text-base font-bold">Read the Docs</Link>
+          </div>
+        </section>
       </main>
+
+      <footer className="border-t border-white/10 mt-20 py-10 px-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-8">
+          <div className="col-span-2 flex flex-col gap-4">
+            <div className="flex items-center gap-4 text-white">
+              <div className="size-4 text-primary">
+                <svg fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg"><path d="M24 4C25.7818 14.2173 33.7827 22.2182 44 24C33.7827 25.7818 25.7818 33.7827 24 44C22.2182 33.7827 14.2173 25.7818 4 24C14.2173 22.2182 22.2182 14.2173 24 4Z" fill="currentColor"></path></svg>
+              </div>
+              <h2 className="text-white text-lg font-bold tracking-[-0.015em]">Astraeus</h2>
+            </div>
+            <p className="text-white/60 text-sm">Orchestrating the next wave of the internet.</p>
+          </div>
+          <div className="flex flex-col gap-4">
+            <p className="text-white font-bold text-sm">Product</p>
+            <Link className="text-white/60 hover:text-white text-sm" href="/product">Platform</Link>
+            <Link className="text-white/60 hover:text-white text-sm" href="/marketplace">Marketplace</Link>
+          </div>
+          <div className="flex flex-col gap-4">
+            <p className="text-white font-bold text-sm">Developers</p>
+            <Link className="text-white/60 hover:text-white text-sm" href="/developer/api-docs">Documentation</Link>
+            <Link className="text-white/60 hover:text-white text-sm" href="/developer">API Reference</Link>
+            <a className="text-white/60 hover:text-white text-sm" href="https://github.com/aidenlippert/hermes" target="_blank" rel="noreferrer">GitHub</a>
+          </div>
+          <div className="flex flex-col gap-4">
+            <p className="text-white font-bold text-sm">Resources</p>
+            <Link className="text-white/60 hover:text-white text-sm" href="/help-center">Help Center</Link>
+            <Link className="text-white/60 hover:text-white text-sm" href="/security">Security</Link>
+            <Link className="text-white/60 hover:text-white text-sm" href="/mesh">Mesh</Link>
+          </div>
+          <div className="flex flex-col gap-4">
+            <p className="text-white font-bold text-sm">Legal</p>
+            <Link className="text-white/60 hover:text-white text-sm" href="/privacy">Privacy Policy</Link>
+            <Link className="text-white/60 hover:text-white text-sm" href="/terms">Terms of Service</Link>
+          </div>
+        </div>
+        <div className="mt-10 pt-6 border-t border-white/10 flex justify-between items-center">
+          <p className="text-white/60 text-sm">© {new Date().getFullYear()} Astraeus Protocol. All rights reserved.</p>
+        </div>
+      </footer>
     </div>
   )
 }
