@@ -80,8 +80,29 @@ class User(Base):
     full_name = Column(String, nullable=True)
 
     # Role and subscription
-    role = Column(SQLEnum(UserRole), default=UserRole.USER, nullable=False)
-    subscription_tier = Column(SQLEnum(SubscriptionTier), default=SubscriptionTier.FREE, nullable=False)
+    # Use explicit PostgreSQL enum type names and bind enum VALUES (lowercase), not NAMES (uppercase)
+    role = Column(
+        SQLEnum(
+            UserRole,
+            name="userrole",
+            native_enum=True,
+            create_type=False,
+            values_callable=lambda enum: [e.value for e in enum],
+        ),
+        default=UserRole.USER,
+        nullable=False,
+    )
+    subscription_tier = Column(
+        SQLEnum(
+            SubscriptionTier,
+            name="subscriptiontier",
+            native_enum=True,
+            create_type=False,
+            values_callable=lambda enum: [e.value for e in enum],
+        ),
+        default=SubscriptionTier.FREE,
+        nullable=False,
+    )
 
     # Usage tracking
     total_requests = Column(Integer, default=0)
