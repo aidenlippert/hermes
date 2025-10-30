@@ -1,0 +1,56 @@
+name: CI Smoke
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install aiosqlite uvicorn
+
+      - name: Start backend (SQLite)
+        env:
+          DATABASE_URL: sqlite+aiosqlite:///./hermes_dev.db
+          PYTHONUNBUFFERED: '1'
+        run: |
+          nohup python -m uvicorn backend.main_v2:app --host 127.0.0.1 --port 8000 --log-level warning &
+          echo $! > uvicorn.pid
+
+      - name: Wait for health
+        run: |
+          for i in {1..60}; do
+            if curl -sSf http://127.0.0.1:8000/api/v1/health >/dev/null; then
+              echo "Backend is up"; exit 0; fi; sleep 1; done
+          echo "Backend did not start"; curl -s http://127.0.0.1:8000/api/v1/health || true; exit 1
+
+      - name: Run CI smoke script
+        env:
+          HERMES_BASE_URL: http://127.0.0.1:8000
+        run: |
+          python scripts/ci_smoke.py
+
+      - name: Run federation inbox smoke
+        env:
+          HERMES_BASE_URL: http://127.0.0.1:8000
+        run: |
+          python scripts/federation_inbox_smoke.py
+
+      - name: Stop backend
+        if: always()
+        run: |
+          if [ -f uvicorn.pid ]; then kill $(cat uvicorn.pid) || true; fi

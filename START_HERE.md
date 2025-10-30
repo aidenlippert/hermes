@@ -1,5 +1,10 @@
 # 🎯 START HERE - Your Next Steps
 
+Quick links:
+- [SPRINT_PLAN_NEXT.md](./SPRINT_PLAN_NEXT.md) — upcoming sprints and acceptance criteria
+- [README_DATABASE.md](./README_DATABASE.md) — Postgres/Redis in Docker, WSL2 notes, troubleshooting
+- [SPRINTS_TECHNICAL.md](./SPRINTS_TECHNICAL.md) — detailed coding plan for Sprints 5–8
+
 Hey! You're about to build something incredible. Here's EXACTLY what to do next.
 
 ## ✅ What's Already Done

@@ -282,6 +282,18 @@ class AuthService:
         return await AuthService.get_user_by_id(db, api_key.user_id)
 
     @staticmethod
+    async def get_api_key(db: AsyncSession, key: str) -> Optional[APIKey]:
+        """Fetch APIKey record by key string"""
+        stmt = select(APIKey).where(APIKey.key == key, APIKey.is_active == True)
+        result = await db.execute(stmt)
+        api_key = result.scalar_one_or_none()
+        if not api_key:
+            return None
+        if api_key.expires_at and api_key.expires_at < datetime.utcnow():
+            return None
+        return api_key
+
+    @staticmethod
     def check_rate_limit(user: User) -> bool:
         """
         Check if user is within their rate limit.

@@ -234,6 +234,35 @@ pip install -r requirements.txt
 - Check that nothing is blocking localhost:10001
 - Try restarting both the agent and the test
 
+## 🪟 Windows Quickstart (SQLite Dev Mode)
+
+Use this path to run the full backend without external services.
+
+1) Start the backend and keep this terminal open
+
+```powershell
+$env:DATABASE_URL = 'sqlite+aiosqlite:///c:/Users/aiden/hermes/hermes_dev.db'
+python -m uvicorn backend.main_v2:app --host 127.0.0.1 --port 8000 --log-level info
+```
+
+You should see Database initialized, a Redis warning (ok), and "Hermes Platform Ready!".
+
+2) In a second terminal, run a quick smoke test
+
+```powershell
+python -c "import requests,uuid,time; BASE='http://127.0.0.1:8000'; print('health:', requests.get(BASE + '/api/v1/health', timeout=5).status_code); email='orgdemo_%d_%s@example.com' % (int(time.time()), uuid.uuid4().hex[:6]); r=requests.post(BASE + '/api/v1/auth/register', json={'email':email,'password':'demo123'}); tok=r.json()['access_token']; hdr={'Authorization': 'Bearer ' + tok}; on='TestOrg-%d-%s' % (int(time.time()), uuid.uuid4().hex[:6]); org=requests.post(BASE + '/api/v1/orgs', headers=hdr, json={'name':on}).json(); oid=org['id']; print('assign:', requests.post(BASE + f'/api/v1/orgs/{oid}/assign_demo_agents', headers=hdr).status_code); print('agents:', requests.get(BASE + '/api/v1/agents', headers=hdr).status_code)"
+```
+
+3) Optional federation smoke
+
+```powershell
+python scripts/federation_inbox_smoke.py
+```
+
+Tips:
+- If your prompt shows `>>>`, you are in the Python REPL. Type `exit()` to return to PowerShell.
+- Keep the server running in Terminal 1; run tests and curls in Terminal 2.
+
 ## 📚 Understanding A2A
 
 The A2A protocol has three key parts:

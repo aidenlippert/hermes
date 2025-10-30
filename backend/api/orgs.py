@@ -171,6 +171,54 @@ async def assign_agent_to_org(org_id: str, agent_id: str, user: User = Depends(g
     return {"ok": True}
 
 
+@router.post("/orgs/{org_id}/assign_demo_agents")
+async def assign_demo_agents(org_id: str, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)) -> Dict[str, Any]:
+    """Assign seeded demo agents to the specified org (dev helper).
+
+    Requires the caller to be an admin of the org. Idempotent: reassigns only when needed.
+    """
+    await _require_org_admin(db, org_id, cast(str, user.id))
+
+    demo_names = [
+        "FlightBooker",
+        "HotelBooker",
+        "RestaurantFinder",
+        "EventsFinder",
+    ]
+
+    # Fetch agents by name
+    res = await db.execute(select(Agent).where(Agent.name.in_(demo_names)))
+    agents = list(res.scalars().all())
+
+    assigned: List[str] = []
+    skipped: List[str] = []
+    names_found: Set[str] = set()
+
+    for a in agents:
+        names_found.add(cast(str, a.name))
+        # If already assigned to this org, skip
+        current_org = cast(Optional[str], getattr(a, "org_id", None))
+        if current_org == org_id:
+            skipped.append(cast(str, a.name))
+            continue
+        setattr(a, "org_id", str(org_id))
+        assigned.append(cast(str, a.name))
+
+    # Commit only if changes
+    if assigned:
+        await db.commit()
+
+    missing = [n for n in demo_names if n not in names_found]
+
+    return {
+        "ok": True,
+        "assigned": assigned,
+        "skipped": skipped,
+        "missing": missing,
+        "total": len(assigned),
+    }
+
+
 class SetOrgAllowRequest(BaseModel):
     source_org_id: str
     target_org_id: str

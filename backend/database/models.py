@@ -14,7 +14,7 @@ Tables:
 - messages: Individual messages in conversations
 """
 
-from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, Text, ForeignKey, JSON, Enum as SQLEnum
+from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, Text, ForeignKey, JSON, Enum as SQLEnum, UniqueConstraint, Index
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from datetime import datetime
@@ -60,6 +60,11 @@ class AgentStatus(str, Enum):
     INACTIVE = "inactive"
     PENDING_REVIEW = "pending_review"
     REJECTED = "rejected"
+
+
+class OrganizationRole(str, Enum):
+    MEMBER = "member"
+    ADMIN = "admin"
 
 
 # Models
@@ -167,6 +172,9 @@ class Agent(Base):
     # Agent card (raw JSON from A2A discovery)
     agent_card = Column(JSON, nullable=True)
 
+    # Organization ownership (optional)
+    org_id = Column(String, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
+
     # Creator
     creator_id = Column(String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
@@ -177,11 +185,55 @@ class Agent(Base):
 
     # Relationships
     creator = relationship("User", back_populates="created_agents", foreign_keys=[creator_id])
+    # Set by Organization.agents relationship below once Organization is defined
     ratings = relationship("AgentRating", back_populates="agent", cascade="all, delete-orphan")
     executions = relationship("Execution", back_populates="agent")
 
     def __repr__(self):
         return f"<Agent {self.name}>"
+
+
+class Organization(Base):
+    """Tenant organization for users and agents"""
+    __tablename__ = "organizations"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String, unique=True, nullable=False, index=True)
+    domain = Column(String, unique=True, nullable=True, index=True)  # optional DNS domain for federation
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    members = relationship("OrganizationMember", back_populates="organization", cascade="all, delete-orphan")
+    agents = relationship("Agent", backref="organization")
+
+    def __repr__(self):
+        return f"<Organization {self.name}>"
+
+
+class OrganizationMember(Base):
+    """Membership linking users to organizations with roles"""
+    __tablename__ = "organization_members"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    organization_id = Column(String, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    role = Column(SQLEnum(OrganizationRole), default=OrganizationRole.MEMBER, nullable=False)
+
+    joined_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Unique member per org
+    __table_args__ = (
+        UniqueConstraint('organization_id', 'user_id', name='uq_org_member'),
+    )
+
+    # Relationships
+    organization = relationship("Organization", back_populates="members")
+    user = relationship("User")
+
+    def __repr__(self):
+        return f"<OrgMember {self.organization_id}:{self.user_id} ({self.role.value})>"
 
 
 class AgentRating(Base):
@@ -440,6 +492,8 @@ class A2AMessage(Base):
     message_type = Column(SQLEnum(MessageType), nullable=False)
     content = Column(JSON, nullable=False)
     requires_response = Column(Boolean, default=False)
+    # Idempotency support (unique per sender)
+    idempotency_key = Column(String, nullable=True, index=True)
     
     # Metadata
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -449,6 +503,110 @@ class A2AMessage(Base):
     
     def __repr__(self):
         return f"<A2AMessage {self.id} - {self.message_type.value}>"
+
+
+class A2AMessageReceipt(Base):
+    """Delivery receipts per recipient agent for A2A messages"""
+    __tablename__ = "a2a_message_receipts"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    message_id = Column(String, ForeignKey("a2a_messages.id", ondelete="CASCADE"), nullable=False, index=True)
+    agent_id = Column(String, ForeignKey("agents.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    delivered_at = Column(DateTime(timezone=True), nullable=True)
+    acked_at = Column(DateTime(timezone=True), nullable=True)
+    delivery_attempts = Column(Integer, default=0)
+    last_attempt_at = Column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint('message_id', 'agent_id', name='uq_message_receipt_per_agent'),
+    )
+
+
+class A2AOrgAllow(Base):
+    """Org-level allowlist for inter-org A2A communication (unidirectional)"""
+    __tablename__ = "a2a_org_allows"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    source_org_id = Column(String, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    target_org_id = Column(String, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    allowed = Column(Boolean, default=True, nullable=False)
+
+    created_by = Column(String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint('source_org_id', 'target_org_id', name='uq_a2a_org_allow_pair'),
+    )
+
+
+class A2AAgentAllow(Base):
+    """Agent-level allowlist for inter-agent A2A communication (unidirectional)"""
+    __tablename__ = "a2a_agent_allows"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    source_agent_id = Column(String, ForeignKey("agents.id", ondelete="CASCADE"), nullable=False, index=True)
+    target_agent_id = Column(String, ForeignKey("agents.id", ondelete="CASCADE"), nullable=False, index=True)
+    allowed = Column(Boolean, default=True, nullable=False)
+
+    created_by = Column(String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint('source_agent_id', 'target_agent_id', name='uq_a2a_agent_allow_pair'),
+    )
+
+
+# ============================================================
+# FEDERATION ADDRESS BOOK & POLICY CACHE
+# ============================================================
+
+class FederationContact(Base):
+    """Maps a remote federated identity (agent@domain) to local records.
+
+    Used for address book management and auditing of remote participants.
+    """
+    __tablename__ = "federation_contacts"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    remote_agent_at = Column(String, nullable=False, index=True)  # e.g., "AgentName@example.com"
+    remote_agent_name = Column(String, nullable=True)
+    remote_domain = Column(String, nullable=True, index=True)
+
+    # Linkages
+    remote_org_id = Column(String, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
+    local_agent_id = Column(String, ForeignKey("agents.id", ondelete="SET NULL"), nullable=True, index=True)
+    local_org_id = Column(String, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
+
+    # Metadata
+    last_seen_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint('remote_agent_at', name='uq_fed_contact_remote_identity'),
+        Index('ix_fed_contact_domain_name', 'remote_domain', 'remote_agent_name'),
+    )
+
+
+class A2APolicyCache(Base):
+    """Cache decisions for A2A ACL evaluations (best-effort, can be stale).
+
+    A row can represent an org-level or agent-level evaluation depending on which ids are set.
+    """
+    __tablename__ = "a2a_policy_cache"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    source_org_id = Column(String, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True)
+    target_org_id = Column(String, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True)
+    source_agent_id = Column(String, ForeignKey("agents.id", ondelete="CASCADE"), nullable=True, index=True)
+    target_agent_id = Column(String, ForeignKey("agents.id", ondelete="CASCADE"), nullable=True, index=True)
+
+    allowed = Column(Boolean, default=False, nullable=False)
+    evaluated_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint('source_org_id', 'target_org_id', 'source_agent_id', 'target_agent_id', name='uq_a2a_policy_cache_key'),
+    )
 
 
 class Conversation(Base):

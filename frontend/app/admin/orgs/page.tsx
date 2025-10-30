@@ -30,6 +30,23 @@ export default function OrgsAdminPage() {
   const [loadingAgents, setLoadingAgents] = useState(false);
 
   const [assignAgentId, setAssignAgentId] = useState("");
+  const [assignDemoBusy, setAssignDemoBusy] = useState(false);
+  const [assignDemoMsg, setAssignDemoMsg] = useState<string>("");
+
+  // Federation contacts
+  type FedContact = {
+    id: string;
+    remote_agent_at: string;
+    remote_agent_name?: string | null;
+    remote_domain?: string | null;
+    remote_org_id?: string | null;
+    local_agent_id?: string | null;
+    local_org_id?: string | null;
+    last_seen_at?: string | null;
+  };
+  const [contacts, setContacts] = useState<FedContact[]>([]);
+  const [contactsLoading, setContactsLoading] = useState(false);
+  const [contactsFilter, setContactsFilter] = useState("");
 
   const [orgAllowSource, setOrgAllowSource] = useState("");
   const [orgAllowTarget, setOrgAllowTarget] = useState("");
@@ -91,6 +108,16 @@ export default function OrgsAdminPage() {
     }
   };
 
+  const loadContacts = async () => {
+    setContactsLoading(true);
+    try {
+      const data = await fetcher(`/api/v1/a2a/federation/contacts`);
+      setContacts(data.contacts ?? []);
+    } finally {
+      setContactsLoading(false);
+    }
+  };
+
   useEffect(() => {
     // no auto load until token provided
   }, []);
@@ -127,6 +154,24 @@ export default function OrgsAdminPage() {
     await loadAgents();
   };
 
+  const onAssignDemoAgents = async () => {
+    if (!selectedOrgId) return;
+    setAssignDemoBusy(true);
+    setAssignDemoMsg("");
+    try {
+      const data = await fetcher(`/api/v1/orgs/${selectedOrgId}/assign_demo_agents`, { method: "POST", body: {} });
+      const assigned = (data?.assigned ?? []).join(", ");
+      const skipped = (data?.skipped ?? []).join(", ");
+      const missing = (data?.missing ?? []).join(", ");
+      setAssignDemoMsg(`assigned: [${assigned}] | skipped: [${skipped}] | missing: [${missing}]`);
+      await loadAgents();
+    } catch (e: any) {
+      setAssignDemoMsg(`error: ${e?.message || String(e)}`);
+    } finally {
+      setAssignDemoBusy(false);
+    }
+  };
+
   const onSetOrgAllow = async (e: React.FormEvent) => {
     e.preventDefault();
     await fetcher(`/api/v1/a2a/allow/org`, {
@@ -156,8 +201,8 @@ export default function OrgsAdminPage() {
             value={token}
             onChange={(e) => setToken(e.target.value)}
           />
-          <button className="border rounded px-3 py-1" onClick={() => { loadOrgs(); loadAgents(); }}>
-            Load Orgs & Agents
+          <button className="border rounded px-3 py-1" onClick={() => { loadOrgs(); loadAgents(); loadContacts(); }}>
+            Load Orgs, Agents & Contacts
           </button>
         </div>
       </section>
@@ -230,6 +275,25 @@ export default function OrgsAdminPage() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div className="border rounded p-3">
+            <h3 className="font-medium mb-2">Assign Demo Agents to Org</h3>
+            <div className="flex items-center gap-2">
+              <label>Org</label>
+              <select className="border rounded px-2 py-1" value={selectedOrgId} onChange={(e) => setSelectedOrgId(e.target.value)}>
+                <option value="">--</option>
+                {orgs.map((o) => (
+                  <option key={o.id} value={o.id}>{o.name}</option>
+                ))}
+              </select>
+              <button className="border rounded px-3 py-1" disabled={!selectedOrgId || assignDemoBusy} onClick={onAssignDemoAgents}>
+                {assignDemoBusy ? "Assigning..." : "Assign Demo Agents"}
+              </button>
+            </div>
+            {assignDemoMsg && (
+              <p className="text-sm text-gray-600 mt-2 break-all">{assignDemoMsg}</p>
+            )}
+          </div>
+
+          <div className="border rounded p-3">
             <h3 className="font-medium mb-2">Assign Agent to Org</h3>
             <form className="flex flex-col gap-2" onSubmit={onAssignAgent}>
               <div className="flex items-center gap-2">
@@ -252,6 +316,51 @@ export default function OrgsAdminPage() {
               </div>
               <button className="border rounded px-3 py-1" disabled={!selectedOrgId || !assignAgentId}>Assign</button>
             </form>
+          </div>
+
+          <div className="border rounded p-3">
+            <h3 className="font-medium mb-2">Federation Contacts</h3>
+            <div className="flex items-center gap-2 mb-2">
+              <button className="border rounded px-3 py-1" onClick={loadContacts} disabled={contactsLoading}>Refresh</button>
+              <input className="border rounded px-2 py-1" placeholder="Filter by domain or name..." value={contactsFilter} onChange={(e) => setContactsFilter(e.target.value)} />
+              <span className="text-sm text-gray-500">{contactsLoading ? "Loading..." : `${contacts.length} contacts`}</span>
+            </div>
+            <div className="max-h-64 overflow-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left border-b">
+                    <th className="py-1 pr-2">Remote</th>
+                    <th className="py-1 pr-2">Domain</th>
+                    <th className="py-1 pr-2">Last Seen</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {contacts
+                    .filter((c) => {
+                      const f = contactsFilter.toLowerCase();
+                      if (!f) return true;
+                      return (
+                        (c.remote_domain || "").toLowerCase().includes(f) ||
+                        (c.remote_agent_at || "").toLowerCase().includes(f) ||
+                        (c.remote_agent_name || "").toLowerCase().includes(f)
+                      );
+                    })
+                    .map((c) => (
+                      <tr key={c.id} className="border-b">
+                        <td className="py-1 pr-2">
+                          <span className="font-mono">{c.remote_agent_at}</span>
+                          {c.remote_agent_name ? <span className="text-gray-500 ml-1">({c.remote_agent_name})</span> : null}
+                        </td>
+                        <td className="py-1 pr-2">{c.remote_domain || ""}</td>
+                        <td className="py-1 pr-2">{c.last_seen_at ? new Date(c.last_seen_at).toLocaleString() : ""}</td>
+                      </tr>
+                    ))}
+                  {contacts.length === 0 && (
+                    <tr><td className="py-2 text-gray-500" colSpan={3}>No contacts</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <div className="border rounded p-3">

@@ -78,8 +78,12 @@ app.include_router(v1_websocket.router, prefix="/api/v1", tags=["WebSocket"])
 # Include Marketplace router
 from backend.api import marketplace
 from backend.api import a2a
+from backend.api import orgs
+from backend.api import federation
 app.include_router(marketplace.router)
 app.include_router(a2a.router)
+app.include_router(orgs.router)
+app.include_router(federation.router)
 
 # Security
 security = HTTPBearer()
@@ -1063,16 +1067,17 @@ async def startup():
     logger.info("🚀 Hermes Platform Starting...")
 
     try:
-        # try:
-        #     import asyncio
-        #     await asyncio.wait_for(init_db(), timeout=10.0)
-        #     logger.info("✅ PostgreSQL initialized")
-        # except asyncio.TimeoutError:
-        #     logger.error("❌ PostgreSQL init timed out after 10s")
-        #     raise
-        # except Exception as e:
-        #     logger.error(f"❌ PostgreSQL init failed: {e}")
-        #     raise
+        # Ensure database tables exist (works for Postgres and SQLite)
+        try:
+            import asyncio as _asyncio
+            await _asyncio.wait_for(init_db(), timeout=15.0)
+            logger.info("✅ Database initialized")
+        except _asyncio.TimeoutError:
+            logger.error("❌ Database init timed out after 15s")
+            raise
+        except Exception as e:
+            logger.error(f"❌ Database init failed: {e}")
+            raise
 
         # Initialize Redis with timeout
         try:
@@ -1080,10 +1085,12 @@ async def startup():
             logger.info("✅ Redis initialized")
         except asyncio.TimeoutError:
             logger.error("❌ Redis init timed out after 5s")
-            raise
+            # Continue in degraded mode without Redis
+            pass
         except Exception as e:
             logger.error(f"❌ Redis init failed: {e}")
-            raise
+            # Continue in degraded mode without Redis
+            pass
 
         # Seed travel agents (non-blocking)
         try:
