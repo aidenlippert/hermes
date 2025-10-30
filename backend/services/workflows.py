@@ -64,13 +64,17 @@ class WorkflowCompiler:
         
         # Validate node references in edges
         for edge in self.edges:
-            from_node = edge['from_node_id']
-            to_node = edge['to_node_id']
+            from_node = edge.get('from_node_id')
+            to_node = edge.get('to_node_id')
             
-            if from_node not in self.nodes:
+            if from_node and from_node not in self.nodes:
                 errors.append(f"Edge references non-existent from_node: {from_node}")
-            if to_node not in self.nodes:
+            if to_node and to_node not in self.nodes:
                 errors.append(f"Edge references non-existent to_node: {to_node}")
+        
+        # If there are invalid node references, return early before cycle detection
+        if errors:
+            return False, errors
         
         # Check for cycles
         has_cycle, cycle_info = self._detect_cycle()
@@ -138,14 +142,33 @@ class WorkflowCompiler:
         """
         Find nodes that cannot be reached from any start node.
         Start nodes are those with no incoming edges.
+        
+        Additionally, detect isolated nodes (no incoming AND no outgoing edges)
+        that are separate from the main workflow graph.
         """
         # Find start nodes (no incoming edges)
         start_nodes = [node_id for node_id in self.nodes 
                       if not self.reverse_adjacency[node_id]]
         
         if not start_nodes:
-            # No start nodes means cycle or isolated nodes
+            # No start nodes - all nodes are isolated or in cycles
+            # Return all nodes as potentially unreachable (except in cycles)
+            if len(self.nodes) > 1:
+                return list(self.nodes.keys())
             return []
+        
+        # If there are multiple start nodes, check if they're isolated
+        # An isolated node has no incoming AND no outgoing edges
+        isolated_nodes = [node_id for node_id in start_nodes 
+                         if not self.adjacency[node_id]]
+        
+        # The main workflow should have one primary start node
+        # If we have isolated nodes AND other start nodes, the isolated ones are unreachable
+        non_isolated_starts = [n for n in start_nodes if n not in isolated_nodes]
+        
+        if non_isolated_starts and isolated_nodes:
+            # Isolated nodes are separate from main workflow
+            return isolated_nodes
         
         # BFS from all start nodes
         reachable = set()
