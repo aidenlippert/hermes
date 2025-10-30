@@ -9,6 +9,7 @@ services:
       POSTGRES_USER: hermes
       POSTGRES_PASSWORD: hermes_dev_password
       POSTGRES_DB: hermes
+      POSTGRES_HOST_AUTH_METHOD: md5
     ports:
       - "5432:5432"
     volumes:
@@ -31,7 +32,7 @@ services:
       - redis_data:/data
     command: redis-server --appendonly yes --requirepass hermes_dev_password
     healthcheck:
-      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      test: ["CMD", "redis-cli", "-a", "hermes_dev_password", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
