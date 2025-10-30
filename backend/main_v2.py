@@ -14,6 +14,7 @@ All the features we brainstormed - NOW WORKING!
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import Request
 from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional, List, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -282,13 +283,43 @@ async def register(request: RegisterRequest, db: AsyncSession = Depends(get_db))
 
 
 @app.post("/api/v1/auth/login", response_model=TokenResponse)
-async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
+async def login(request: Request, db: AsyncSession = Depends(get_db)):
     """
-    Login with email and password.
+    Login endpoint accepts either:
+    - JSON: { email, password }
+    - x-www-form-urlencoded: username (email), password
 
     Returns access tokens on success.
     """
-    user = await AuthService.authenticate_user(db, request.email, request.password)
+    content_type = request.headers.get("content-type", "").lower()
+
+    email: Optional[str] = None
+    password: Optional[str] = None
+
+    try:
+        if content_type.startswith("application/x-www-form-urlencoded") or content_type.startswith("multipart/form-data"):
+            form = await request.form()
+            # Frontend sends 'username' for OAuth2 compatibility; treat it as email
+            email = (form.get("username") or form.get("email") or "").strip()
+            password = (form.get("password") or "")
+        else:
+            body = await request.json()
+            email = (body.get("email") or body.get("username") or "").strip()
+            password = (body.get("password") or "")
+    except Exception:
+        raise HTTPException(status_code=422, detail="Invalid login payload")
+
+    # Basic validation
+    if not email or not password:
+        raise HTTPException(status_code=422, detail="Email and password are required")
+
+    # Truncate password to 72 bytes for bcrypt safety (mirrors validators)
+    try:
+        password = password.encode("utf-8")[:72].decode("utf-8", errors="ignore")
+    except Exception:
+        pass
+
+    user = await AuthService.authenticate_user(db, email, password)
 
     if not user:
         raise HTTPException(status_code=401, detail="Invalid email or password")
