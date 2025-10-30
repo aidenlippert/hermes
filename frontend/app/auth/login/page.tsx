@@ -5,10 +5,12 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { EyeOff, Eye, AlertCircle } from "lucide-react"
 import { useAuthStore } from "@/lib/store"
+import { api } from "@/lib/api"
 
 export default function LoginPage() {
   const router = useRouter()
   const setTokens = useAuthStore((state) => state.setTokens)
+  const setAuth = useAuthStore((state) => state.setAuth as (token: string, user: any) => void)
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -39,12 +41,27 @@ export default function LoginPage() {
         throw new Error(data.detail || "Login failed. Please check your credentials.")
       }
 
+      // Store tokens immediately
       setTokens(data.access_token, data.refresh_token)
+      
+      // Prefer user from response; otherwise fetch /auth/me
+      try {
+        if (data.user) {
+          setAuth(data.access_token, data.user)
+        } else {
+          const me = await api.auth.getMe(data.access_token)
+          setAuth(data.access_token, me)
+        }
+      } catch (e) {
+        // Non-fatal: proceed without user prefetch
+        console.warn("Login succeeded but fetching user profile failed:", e)
+      }
       
       router.push("/chat")
 
     } catch (err: any) {
-      setError(err.message)
+      console.error("Login error:", err)
+      setError(err.message || "Login failed")
     } finally {
       setLoading(false)
     }

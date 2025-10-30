@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Enable production source maps for better stack traces on Vercel
+  productionBrowserSourceMaps: true,
+  reactStrictMode: true,
   async rewrites() {
     return [
       {
