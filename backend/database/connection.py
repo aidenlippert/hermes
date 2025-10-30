@@ -78,6 +78,12 @@ async def init_db():
     """
     logger.info("🔧 Initializing database...")
 
+    # Ensure models are imported so Base.metadata is populated
+    try:
+        from . import models as _models  # noqa: F401
+    except Exception as e:
+        logger.error(f"❌ Failed importing models: {e}")
+
     # Try to install pgvector extension (optional, for semantic search)
     try:
         async with engine.begin() as conn:
@@ -90,24 +96,38 @@ async def init_db():
     # Create all tables (separate transaction)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        logger.info("✅ Database tables created")
+        try:
+            tables = list(Base.metadata.tables.keys())
+            logger.info(f"✅ Database tables ensured: {tables}")
+        except Exception:
+            logger.info("✅ Database tables created")
 
 
 async def init_redis():
-    """Initialize Redis connection"""
+    """Initialize Redis connection.
+
+    In local/dev environments where Redis is not available, this will fall back
+    to a disabled state (redis_client=None) rather than raising, so the app can
+    still start and non-Redis features remain usable.
+    """
     global redis_client
 
     logger.info("🔧 Initializing Redis...")
 
-    redis_client = await redis.from_url(
-        REDIS_URL,
-        encoding="utf-8",
-        decode_responses=True
-    )
+    try:
+        redis_client = await redis.from_url(
+            REDIS_URL,
+            encoding="utf-8",
+            decode_responses=True
+        )
 
-    # Test connection
-    await redis_client.ping()
-    logger.info("✅ Redis connected")
+        # Test connection
+        await redis_client.ping()
+        logger.info("✅ Redis connected")
+    except Exception as e:
+        logger.error(f"❌ Redis init failed: {e}")
+        redis_client = None
+        # Do not raise to allow degraded startup without Redis
 
 
 async def close_redis():
