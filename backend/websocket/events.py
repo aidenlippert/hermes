@@ -62,6 +62,21 @@ class EventType(str, Enum):
     ERROR = "error"
     WARNING = "warning"
 
+    # Workflow events (Sprint 5)
+    WORKFLOW_STARTED = "workflow_started"
+    WORKFLOW_COMPLETED = "workflow_completed"
+    WORKFLOW_FAILED = "workflow_failed"
+    WORKFLOW_CANCELLED = "workflow_cancelled"
+    WORKFLOW_CANCELLING = "workflow_cancelling"
+    LEVEL_STARTED = "level_started"
+    LEVEL_COMPLETED = "level_completed"
+    NODE_STARTED = "node_started"
+    NODE_COMPLETED = "node_completed"
+    NODE_FAILED = "node_failed"
+    NODE_RETRY = "node_retry"
+    AGENT_CALLING = "agent_calling"
+    HUMAN_GATE_WAITING = "human_gate_waiting"
+
 
 class Event:
     """Base event class"""
@@ -284,3 +299,28 @@ def error_event(task_id: str, error: str, data: Dict = None) -> Event:
         data,
         f"❌ {error}"
     )
+
+
+# ============================================================================
+# WORKFLOW EVENT BUILDERS (Sprint 5)
+# ============================================================================
+
+def build_workflow_event(event_type: str, workflow_run_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Build a workflow event for WebSocket streaming.
+    
+    Args:
+        event_type: Type of workflow event
+        workflow_run_id: ID of the workflow run
+        data: Event data
+        
+    Returns:
+        Event dictionary ready for JSON serialization
+    """
+    return {
+        "type": event_type,
+        "workflow_run_id": workflow_run_id,
+        "data": data,
+        "timestamp": datetime.utcnow().isoformat()
+    }
+

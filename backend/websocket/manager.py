@@ -36,6 +36,9 @@ class ConnectionManager:
         # Maps agent_id -> set of WebSocket connections (for A2A)
         self.agent_connections: Dict[str, Set[WebSocket]] = {}
 
+        # Maps workflow_run_id -> set of WebSocket connections (Sprint 5)
+        self.workflow_connections: Dict[str, Set[WebSocket]] = {}
+
         logger.info("📡 WebSocket Manager initialized")
 
     async def connect(self, websocket: WebSocket, task_id: str, user_id: Optional[str] = None):
@@ -234,13 +237,16 @@ class ConnectionManager:
         """Get WebSocket statistics"""
         total_connections = sum(len(conns) for conns in self.active_connections.values())
         total_agent_conns = sum(len(conns) for conns in self.agent_connections.values())
+        total_workflow_conns = sum(len(conns) for conns in self.workflow_connections.values())
 
         return {
             "total_connections": total_connections,
             "total_agent_connections": total_agent_conns,
+            "total_workflow_connections": total_workflow_conns,
             "active_tasks": len(self.active_connections),
             "active_users": len(self.user_connections),
             "active_agents": len(self.agent_connections),
+            "active_workflows": len(self.workflow_connections),
             "tasks": {
                 task_id[:8] + "...": len(conns)
                 for task_id, conns in self.active_connections.items()
@@ -248,8 +254,57 @@ class ConnectionManager:
             "agents": {
                 agent_id: len(conns)
                 for agent_id, conns in self.agent_connections.items()
+            },
+            "workflows": {
+                workflow_id[:8] + "...": len(conns)
+                for workflow_id, conns in self.workflow_connections.items()
             }
         }
+
+    async def connect_workflow(self, websocket: WebSocket, workflow_run_id: str):
+        """Accept a WebSocket connection for workflow run updates (Sprint 5)"""
+        await websocket.accept()
+        if workflow_run_id not in self.workflow_connections:
+            self.workflow_connections[workflow_run_id] = set()
+        self.workflow_connections[workflow_run_id].add(websocket)
+        logger.info(f"🔄 Workflow run connected: {workflow_run_id[:8]}...")
+
+    def disconnect_workflow(self, websocket: WebSocket, workflow_run_id: str):
+        """Remove a workflow WebSocket connection"""
+        if workflow_run_id in self.workflow_connections:
+            self.workflow_connections[workflow_run_id].discard(websocket)
+            if not self.workflow_connections[workflow_run_id]:
+                del self.workflow_connections[workflow_run_id]
+        logger.info(f"🔄 Workflow run disconnected: {workflow_run_id[:8]}...")
+
+    async def broadcast_to_workflow(self, workflow_run_id: str, event: Dict[str, Any]):
+        """
+        Send event to all clients subscribed to a workflow run.
+        
+        Args:
+            workflow_run_id: Workflow run ID
+            event: Event data (will be JSON serialized)
+        """
+        if workflow_run_id not in self.workflow_connections:
+            return
+
+        # Add timestamp if not present
+        if "timestamp" not in event:
+            from datetime import datetime, timezone
+            event["timestamp"] = datetime.now(timezone.utc).isoformat()
+
+        # Broadcast to all connections
+        disconnected = []
+        for connection in self.workflow_connections[workflow_run_id]:
+            try:
+                await connection.send_json(event)
+            except Exception as e:
+                logger.error(f"❌ Failed to send to workflow WebSocket: {e}")
+                disconnected.append(connection)
+
+        # Clean up disconnected clients
+        for connection in disconnected:
+            self.disconnect_workflow(connection, workflow_run_id)
 
 
 # Global connection manager instance
