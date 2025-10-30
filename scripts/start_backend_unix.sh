@@ -29,10 +29,17 @@ export DATABASE_URL="sqlite+aiosqlite:///$REPO_ROOT/hermes_dev.db"
 export PYTHONUNBUFFERED=1
 printf "DATABASE_URL=%s\n" "$DATABASE_URL"
 
-# Basic dependency check to provide a friendly hint
-if ! "$PY" -c "import uvicorn" >/dev/null 2>&1; then
-	echo "Dependency 'uvicorn' not found for $PY." 1>&2
-	echo "Install dependencies with: $PY -m pip install -r requirements.txt" 1>&2
+# Basic dependency checks to provide a friendly hint
+MISSING=()
+for MOD in uvicorn fastapi sqlalchemy aiosqlite; do
+	if ! "$PY" -c "import $MOD" >/dev/null 2>&1; then
+		MISSING+=("$MOD")
+	fi
+done
+if (( ${#MISSING[@]} > 0 )); then
+	echo "Missing Python modules for $PY: ${MISSING[*]}" 1>&2
+	echo "Install them with:" 1>&2
+	echo "  $PY -m pip install -r requirements.txt" 1>&2
 	exit 1
 fi
 
