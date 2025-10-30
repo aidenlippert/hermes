@@ -17,7 +17,7 @@ from backend.database.models_workflows import (
 )
 from backend.services.workflows import WorkflowCompiler, validate_workflow, compile_workflow
 from backend.services.workflow_runner import WorkflowRunner
-from backend.api.v1.auth import get_current_user
+from backend.services.auth import get_current_user
 
 router = APIRouter(prefix="/workflows", tags=["workflows"])
 
