@@ -31,8 +31,14 @@ if [ -n "$DATABASE_URL" ]; then
     echo "🔍 Checking for multiple migration heads..."
     HEADS_COUNT=$(alembic heads 2>/dev/null | wc -l)
     if [ "$HEADS_COUNT" -gt 1 ]; then
-      echo "⚠️ Multiple heads detected. Upgrading to merge point (a1afb20e28ab)..."
-      alembic upgrade a1afb20e28ab 2>&1 || echo "⚠️ Migration to merge point failed"
+      echo "⚠️ Multiple heads detected. Upgrading each head individually..."
+      # Upgrade to first head (federation path)
+      alembic upgrade federation_contacts_v1 2>&1 || echo "⚠️ Federation path migration done/failed"
+      # Upgrade to second head (orgs/acl path)  
+      alembic upgrade a2a_p0_1 2>&1 || echo "⚠️ A2A/Orgs path migration done/failed"
+      # Now upgrade to the merge point
+      echo "✅ Upgrading to merge point..."
+      alembic upgrade heads 2>&1 || echo "⚠️ Final merge migration failed"
     else
       echo "✅ Single head found. Upgrading to head..."
       alembic upgrade head 2>&1 || echo "⚠️ Migration failed or no migrations needed"
