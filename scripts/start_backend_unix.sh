@@ -27,7 +27,10 @@ fi
 
 export DATABASE_URL="sqlite+aiosqlite:///$REPO_ROOT/hermes_dev.db"
 export PYTHONUNBUFFERED=1
+# Prefer a passwordless local Redis by default (override with REDIS_URL if needed)
+export REDIS_URL="${REDIS_URL:-redis://localhost:6379/0}"
 printf "DATABASE_URL=%s\n" "$DATABASE_URL"
+printf "REDIS_URL=%s\n" "$REDIS_URL"
 
 # Basic dependency checks to provide a friendly hint
 MISSING=()
