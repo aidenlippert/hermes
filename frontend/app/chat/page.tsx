@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -121,38 +121,8 @@ function ChatPage() {
   const [loadingAgents, setLoadingAgents] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
-  useEffect(() => {
-    setMounted(true)
-    // Load chat history and available agents when component mounts
-    if (accessToken) {
-      loadChatHistory()
-      loadAvailableAgents()
-    }
-  }, [accessToken])
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages, streamingText])
-
-  useEffect(() => {
-    // Cleanup WebSocket on unmount
-    return () => {
-      if (wsConnection) {
-        wsConnection.close()
-      }
-    }
-  }, [wsConnection])
-
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto"
-      textareaRef.current.style.height = textareaRef.current.scrollHeight + "px"
-    }
-  }, [input])
-
-  if (!mounted) return null
-
-  const loadChatHistory = async () => {
+  // Define callbacks before effects to avoid any TDZ issues on some bundlers
+  const loadChatHistory = useCallback(async () => {
     if (!accessToken) return
     setLoadingHistory(true)
     try {
@@ -169,14 +139,13 @@ function ChatPage() {
       }
     } catch (error) {
       console.error("Failed to load chat history:", error)
-      // Use empty array if API fails
       setChatHistories([])
     } finally {
       setLoadingHistory(false)
     }
-  }
+  }, [accessToken])
 
-  const loadAvailableAgents = async () => {
+  const loadAvailableAgents = useCallback(async () => {
     setLoadingAgents(true)
     try {
       // Try authenticated request first
@@ -211,7 +180,40 @@ function ChatPage() {
     } finally {
       setLoadingAgents(false)
     }
-  }
+  }, [accessToken])
+
+  useEffect(() => {
+    setMounted(true)
+    // Load chat history and available agents when component mounts
+    if (accessToken) {
+      loadChatHistory()
+      loadAvailableAgents()
+    }
+  }, [accessToken, loadChatHistory, loadAvailableAgents])
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [messages, streamingText])
+
+  useEffect(() => {
+    // Cleanup WebSocket on unmount
+    return () => {
+      if (wsConnection) {
+        wsConnection.close()
+      }
+    }
+  }, [wsConnection])
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto"
+      textareaRef.current.style.height = textareaRef.current.scrollHeight + "px"
+    }
+  }, [input])
+
+  if (!mounted) return null
+
+  
 
   const simulateTokenStreaming = (text: string) => {
     setStreamingText("")
