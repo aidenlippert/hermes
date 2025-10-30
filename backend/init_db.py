@@ -12,6 +12,11 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 from backend.database.connection import engine
 from backend.database.models import Base
+# Import workflow models so SQLAlchemy knows about them
+from backend.database.models_workflows import (
+    Workflow, WorkflowNode, WorkflowEdge, WorkflowRun, 
+    NodeRun, WorkflowTemplate, WorkflowPermission
+)
 from backend.services.agent_registry import AgentRegistry
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker

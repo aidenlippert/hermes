@@ -32,7 +32,7 @@ class Workflow(Base):
     timeout_seconds = Column(Integer, nullable=True)
     max_retries = Column(Integer, default=3)
     on_error = Column(String(50), default="fail")  # fail, continue, rollback
-    metadata = Column(Text, nullable=True)  # JSON
+    workflow_metadata = Column(Text, nullable=True)  # JSON - renamed to avoid SQLAlchemy conflict
     tags = Column(Text, nullable=True)  # JSON array
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=True, onupdate=datetime.utcnow)
@@ -63,7 +63,7 @@ class Workflow(Base):
             "timeout_seconds": self.timeout_seconds,
             "max_retries": self.max_retries,
             "on_error": self.on_error,
-            "metadata": json.loads(self.metadata) if self.metadata else {},
+            "metadata": json.loads(self.workflow_metadata) if self.workflow_metadata else {},
             "tags": json.loads(self.tags) if self.tags else [],
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
