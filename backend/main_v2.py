@@ -44,7 +44,7 @@ from backend.services.conductor import ConductorService
 from backend.services.seed_agents import seed_travel_agents
 from backend.services.real_agents import execute_real_agents
 from backend.websocket.manager import manager
-from backend.api import v1_websocket
+from backend.api import v1_websocket, chat
 from backend.services.reputation import recalculate_all_trust_scores
 from backend.database.connection import AsyncSessionLocal
 from backend.middleware.rate_limiter import create_rate_limit_middleware
@@ -109,7 +109,7 @@ app.add_middleware(
 # Include routers
 app.include_router(v1_websocket.router, prefix="/api/v1", tags=["WebSocket"])
 
-# Include Marketplace router
+# Include API routers
 from backend.api import marketplace
 from backend.api import a2a
 from backend.api import orgs
@@ -123,6 +123,7 @@ app.include_router(orgs.router)
 app.include_router(federation.router)
 app.include_router(agents.router)
 app.include_router(mesh.router)
+app.include_router(chat.router)
 app.include_router(workflows_api.router, prefix="/api/v1", tags=["Workflows"])
 
 # Security
