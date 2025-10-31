@@ -124,6 +124,23 @@ export const api = {
       );
       return response.data;
     },
+
+    async create(agentData: any, token: string) {
+      const response = await axios.post(
+        `${API_URL}/api/v1/marketplace`,
+        agentData,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      return response.data;
+    },
+
+    async listOwned(token: string) {
+      const response = await axios.get(
+        `${API_URL}/api/v1/agents/owned`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      return response.data;
+    },
   },
 
   conversations: {
