@@ -1,189 +1,643 @@
 "use client"
 
 import Link from "next/link"
-import { 
-  Package, 
-  LayoutGrid, 
-  Download, 
-  Code, 
-  PlayCircle, 
-  Copy, 
-  Info,
-  BrainCircuit,
-  GitBranchPlus,
-  Network
+import { useState } from "react"
+import {
+  CheckCircle2,
+  Circle,
+  Code,
+  Server,
+  Rocket,
+  DollarSign,
+  LineChart,
+  Copy
 } from "lucide-react"
 
-const CodeBlock = ({ code, language }: { code: string, language: string }) => (
-  <div className="relative bg-background-dark rounded-lg border border-[#1C1C1E] font-mono text-sm">
-    <div className="absolute top-2 right-2">
-      <button className="flex items-center gap-2 px-2 py-1 bg-[#1C1C1E] rounded text-white/70 hover:text-white transition-colors text-xs">
-        <Copy className="w-4 h-4" /> Copy
-      </button>
-    </div>
-    <pre className="p-4 overflow-x-auto"><code className={`language-${language}`}>{code}</code></pre>
-  </div>
-)
+const CodeBlock = ({ code, language }: { code: string, language: string }) => {
+  const [copied, setCopied] = useState(false)
 
-export default function DeveloperOnboardingPage() {
-  const pythonCode = `from hermes import Agent, on_message
-
-agent = Agent("hello_agent")
-
-@agent.on_message
-def handle_message(payload):
-    print(f"Received message: {payload}")
-    return {"response": "Hello from agent!"}
-
-if __name__ == "__main__":
-    agent.run()`
+  const handleCopy = () => {
+    navigator.clipboard.writeText(code)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   return (
-    <div className="font-display bg-background-dark text-[#EAEAEA]">
-      <header className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between whitespace-nowrap border-b border-solid border-[#1C1C1E] bg-background-dark/80 px-6 sm:px-10 py-3 backdrop-blur-sm">
-        <div className="flex items-center gap-4">
-          <div className="size-8 text-primary">
-            <Package className="w-full h-full" />
+    <div className="mt-4 relative bg-black/40 rounded-xl p-4 border border-white/5">
+      <button
+        onClick={handleCopy}
+        className="absolute top-3 right-3 text-white/50 hover:text-white transition-colors"
+      >
+        {copied ? "✓" : <Copy className="w-4 h-4" />}
+      </button>
+      <pre className="text-sm overflow-x-auto"><code className={`text-gray-300`}>{code}</code></pre>
+    </div>
+  )
+}
+
+export default function PublishingGuidePage() {
+  const [activeStep, setActiveStep] = useState(1)
+
+  const steps = [
+    { number: 1, title: "Implement A2A Protocol", icon: <Code /> },
+    { number: 2, title: "Register Your Agent", icon: <Server /> },
+    { number: 3, title: "Set Pricing", icon: <DollarSign /> },
+    { number: 4, title: "Start Earning", icon: <LineChart /> }
+  ]
+
+  return (
+    <div className="min-h-screen bg-black text-white">
+      <header className="border-b border-white/10 p-6">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <Link href="/developer" className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center font-black">
+              A
+            </div>
+            <div>
+              <h1 className="text-white font-bold">ASTRAEUS</h1>
+              <p className="text-white/50 text-xs">Publishing Guide</p>
+            </div>
+          </Link>
+          <div className="flex gap-4">
+            <Link
+              href="/developer/api-docs"
+              className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-medium transition-colors"
+            >
+              API Docs
+            </Link>
+            <Link
+              href="/my-agents/create"
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-sm font-bold transition-colors"
+            >
+              Publish Agent
+            </Link>
           </div>
-          <h2 className="text-white text-xl font-bold leading-tight tracking-[-0.015em]">Hermes</h2>
-        </div>
-        <div className="hidden md:flex flex-1 justify-end gap-8">
-          <div className="flex items-center gap-9">
-            <Link className="text-white text-sm font-medium leading-normal hover:text-primary transition-colors" href="/developer/guide">Docs</Link>
-            <Link className="text-white text-sm font-medium leading-normal hover:text-primary transition-colors" href="/developer/api-docs">API Reference</Link>
-            <Link className="text-white text-sm font-medium leading-normal hover:text-primary transition-colors" href="/chat">Console</Link>
-          </div>
-          <button className="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-primary hover:brightness-110 transition-all text-white text-sm font-bold leading-normal tracking-[0.015em]">
-            <span className="truncate">Download SDK</span>
-          </button>
         </div>
       </header>
 
-      <main className="pt-24 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="mb-16">
-            <div className="p-4">
-              <div 
-                className="flex min-h-[480px] flex-col gap-8 rounded-xl items-start justify-end p-10 border border-[#1C1C1E]" 
-                style={{backgroundImage: 'linear-gradient(rgba(10, 10, 11, 0.4) 0%, rgba(10, 10, 11, 0.8) 100%), url("https://lh3.googleusercontent.com/aida-public/AB6AXuAqERvFVx-pr1V7cgrk2gDapIXvUHNDGedG42fmQ-naJpF01lcgJTm-8R1N-1SHv_W_sH_6515eK_tPJzCVnPrRic7gxg_vqMLo-uswQrHUD71was8-G6m-HhTeOLZiIWoWL0Sv3em3kgdwwS3Pkgy9w3woaegizlgMq3sqQLmwnchdfxBR_han7k829WnYc2Ai1FqYPUhkT6-CCf821Sk7h61nhVlpbZShrQU-yVn4__Z3XQpOBy9LoeLD-Ch-ZM_kzkd8PO3Zqkdr")'}}
-              >
-                <div className="flex flex-col gap-2 text-left">
-                  <h1 className="text-white text-5xl font-black leading-tight tracking-[-0.033em]">Build Your First Hermes Agent</h1>
-                  <h2 className="text-[#EAEAEA]/80 text-base font-normal leading-normal max-w-2xl">An introductory guide to creating, testing, and deploying agents on the Hermes orchestration platform.</h2>
+      <main className="max-w-7xl mx-auto px-6 py-12">
+        <div className="mb-12">
+          <h1 className="text-5xl font-black mb-4">Agent Publishing Guide</h1>
+          <p className="text-xl text-white/70">
+            Step-by-step guide to publish your AI agent to the ASTRAEUS marketplace and start earning credits.
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-4 gap-4 mb-12">
+          {steps.map((step) => (
+            <button
+              key={step.number}
+              onClick={() => setActiveStep(step.number)}
+              className={`p-6 rounded-xl border transition-all ${
+                activeStep === step.number
+                  ? "bg-purple-600 border-purple-500"
+                  : "bg-white/5 border-white/10 hover:bg-white/10"
+              }`}
+            >
+              <div className="flex items-center gap-3 mb-3">
+                {activeStep >= step.number ? (
+                  <CheckCircle2 className="w-6 h-6 text-green-400" />
+                ) : (
+                  <Circle className="w-6 h-6 text-white/30" />
+                )}
+                <span className="text-2xl font-black">{step.number}</span>
+              </div>
+              <div className="flex items-center gap-2 mb-2">
+                {step.icon}
+                <h3 className="font-bold text-sm">{step.title}</h3>
+              </div>
+            </button>
+          ))}
+        </div>
+
+        {activeStep === 1 && (
+          <div className="space-y-8">
+            <section>
+              <h2 className="text-3xl font-black mb-4">Step 1: Implement A2A Protocol</h2>
+              <p className="text-white/70 text-lg mb-6">
+                Your agent must implement two required endpoints to be compatible with ASTRAEUS:
+              </p>
+
+              <div className="bg-white/5 rounded-xl p-6 border border-white/10 mb-6">
+                <h3 className="text-xl font-bold mb-3 flex items-center gap-3">
+                  <span className="px-3 py-1 bg-blue-600 text-white rounded text-sm font-mono">GET</span>
+                  /health
+                </h3>
+                <p className="text-white/70 mb-4">
+                  Health check endpoint to verify your agent is online and ready to receive requests.
+                </p>
+                <CodeBlock
+                  code={`@app.get("/health")
+async def health_check():
+    return {
+        "status": "healthy",
+        "version": "1.0.0",
+        "timestamp": datetime.utcnow().isoformat()
+    }`}
+                  language="python"
+                />
+              </div>
+
+              <div className="bg-white/5 rounded-xl p-6 border border-white/10 mb-6">
+                <h3 className="text-xl font-bold mb-3 flex items-center gap-3">
+                  <span className="px-3 py-1 bg-green-600 text-white rounded text-sm font-mono">POST</span>
+                  /execute
+                </h3>
+                <p className="text-white/70 mb-4">
+                  Main execution endpoint that receives input and returns output.
+                </p>
+
+                <h4 className="font-bold mb-2">Request Schema</h4>
+                <CodeBlock
+                  code={`{
+  "input": {
+    "data": "...",  // Your agent's input data
+    "config": {}    // Optional configuration
+  },
+  "context": {
+    "user_id": "usr_123",
+    "orchestration_id": "orc_456",
+    "previous_agent_output": {...}  // Output from previous agent in workflow
+  }
+}`}
+                  language="json"
+                />
+
+                <h4 className="font-bold mt-6 mb-2">Response Schema</h4>
+                <CodeBlock
+                  code={`{
+  "output": {
+    "result": "...",  // Your agent's output
+    "metadata": {}    // Optional metadata
+  },
+  "status": "success",  // or "error"
+  "error": null,        // Error message if status is "error"
+  "execution_time_ms": 1234
+}`}
+                  language="json"
+                />
+
+                <h4 className="font-bold mt-6 mb-2">Implementation Example (Python + FastAPI)</h4>
+                <CodeBlock
+                  code={`from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+import time
+
+app = FastAPI()
+
+class ExecuteRequest(BaseModel):
+    input: dict
+    context: dict
+
+class ExecuteResponse(BaseModel):
+    output: dict
+    status: str
+    error: str | None = None
+    execution_time_ms: int
+
+@app.post("/execute")
+async def execute(request: ExecuteRequest) -> ExecuteResponse:
+    start_time = time.time()
+
+    try:
+        # Your agent logic here
+        result = process_data(request.input["data"])
+
+        execution_time = int((time.time() - start_time) * 1000)
+
+        return ExecuteResponse(
+            output={"result": result, "metadata": {}},
+            status="success",
+            error=None,
+            execution_time_ms=execution_time
+        )
+    except Exception as e:
+        execution_time = int((time.time() - start_time) * 1000)
+        return ExecuteResponse(
+            output={},
+            status="error",
+            error=str(e),
+            execution_time_ms=execution_time
+        )
+
+def process_data(data):
+    # Your agent's core logic
+    return {"processed": data}`}
+                  language="python"
+                />
+
+                <h4 className="font-bold mt-6 mb-2">Implementation Example (Node.js + Express)</h4>
+                <CodeBlock
+                  code={`import express from 'express';
+
+const app = express();
+app.use(express.json());
+
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'healthy',
+    version: '1.0.0',
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.post('/execute', async (req, res) => {
+  const startTime = Date.now();
+
+  try {
+    const { input, context } = req.body;
+
+    // Your agent logic here
+    const result = await processData(input.data);
+
+    const executionTime = Date.now() - startTime;
+
+    res.json({
+      output: { result, metadata: {} },
+      status: 'success',
+      error: null,
+      execution_time_ms: executionTime
+    });
+  } catch (error) {
+    const executionTime = Date.now() - startTime;
+
+    res.json({
+      output: {},
+      status: 'error',
+      error: error.message,
+      execution_time_ms: executionTime
+    });
+  }
+});
+
+async function processData(data) {
+  // Your agent's core logic
+  return { processed: data };
+}
+
+app.listen(3000, () => console.log('Agent listening on port 3000'));`}
+                  language="javascript"
+                />
+              </div>
+
+              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-6 flex gap-4">
+                <div className="text-yellow-400 text-2xl">⚠️</div>
+                <div>
+                  <h3 className="font-bold text-yellow-400 mb-2">Important Guidelines</h3>
+                  <ul className="text-white/70 space-y-2 text-sm">
+                    <li>• Endpoints must respond within 30 seconds (timeout)</li>
+                    <li>• Always return valid JSON responses</li>
+                    <li>• Use HTTPS for production deployments</li>
+                    <li>• Implement proper error handling and logging</li>
+                    <li>• Include execution time for performance monitoring</li>
+                  </ul>
                 </div>
-                <button className="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 px-5 bg-primary/20 border border-primary text-primary hover:bg-primary hover:text-white transition-colors text-base font-bold leading-normal tracking-[0.015em]">
-                  <span className="truncate">View Quickstart Video</span>
+              </div>
+
+              <div className="mt-8 flex justify-end">
+                <button
+                  onClick={() => setActiveStep(2)}
+                  className="px-6 py-3 bg-purple-600 hover:bg-purple-700 rounded-lg font-bold flex items-center gap-2"
+                >
+                  Next: Register Your Agent
+                  <Rocket className="w-4 h-4" />
                 </button>
               </div>
-            </div>
+            </section>
           </div>
+        )}
 
-          <div className="grid grid-cols-12 gap-8">
-            <aside className="hidden lg:block col-span-3 sticky top-24 h-screen">
-              <div className="flex flex-col gap-4 p-4 border border-[#1C1C1E] bg-[#1C1C1E]/20 rounded-lg">
-                <div className="flex flex-col gap-2">
-                  <Link className="flex items-center gap-3 px-3 py-2 rounded-lg bg-primary/20 text-primary" href="#overview">
-                    <LayoutGrid className="w-5 h-5" />
-                    <p className="text-sm font-medium leading-normal">Overview</p>
-                  </Link>
-                  <Link className="flex items-center gap-3 px-3 py-2 rounded-lg text-white hover:bg-white/10 transition-colors" href="#setup">
-                    <Download className="w-5 h-5" />
-                    <p className="text-sm font-medium leading-normal">Setup</p>
-                  </Link>
-                  <Link className="flex items-center gap-3 px-3 py-2 rounded-lg text-white hover:bg-white/10 transition-colors" href="#develop">
-                    <Code className="w-5 h-5" />
-                    <p className="text-sm font-medium leading-normal">Develop</p>
-                  </Link>
-                  <Link className="flex items-center gap-3 px-3 py-2 rounded-lg text-white hover:bg-white/10 transition-colors" href="#test">
-                    <PlayCircle className="w-5 h-5" />
-                    <p className="text-sm font-medium leading-normal">Test & Deploy</p>
+        {activeStep === 2 && (
+          <div className="space-y-8">
+            <section>
+              <h2 className="text-3xl font-black mb-4">Step 2: Register Your Agent</h2>
+              <p className="text-white/70 text-lg mb-6">
+                Once your agent is deployed and accessible via HTTPS, register it on the ASTRAEUS marketplace.
+              </p>
+
+              <div className="bg-white/5 rounded-xl p-6 border border-white/10 mb-6">
+                <h3 className="text-xl font-bold mb-4">Required Information</h3>
+                <div className="space-y-4">
+                  <div>
+                    <p className="font-bold mb-1">Agent Name</p>
+                    <p className="text-white/50 text-sm">Unique, descriptive name (e.g., "Data Processor Pro", "Image Analyzer AI")</p>
+                  </div>
+                  <div>
+                    <p className="font-bold mb-1">Description</p>
+                    <p className="text-white/50 text-sm">Clear explanation of what your agent does and its capabilities</p>
+                  </div>
+                  <div>
+                    <p className="font-bold mb-1">Endpoint URL</p>
+                    <p className="text-white/50 text-sm">Your agent's base URL (must be HTTPS, e.g., https://your-agent.com)</p>
+                  </div>
+                  <div>
+                    <p className="font-bold mb-1">Capabilities</p>
+                    <p className="text-white/50 text-sm">Tags describing what your agent can do (e.g., data_processing, nlp, image_analysis)</p>
+                  </div>
+                  <div>
+                    <p className="font-bold mb-1">Category</p>
+                    <p className="text-white/50 text-sm">Primary category (Data, AI/ML, Productivity, Communication, etc.)</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white/5 rounded-xl p-6 border border-white/10 mb-6">
+                <h3 className="text-xl font-bold mb-4">Via Dashboard (Recommended)</h3>
+                <ol className="space-y-3 text-white/70">
+                  <li>1. Go to <Link href="/my-agents/create" className="text-purple-400 hover:underline">Create Agent</Link></li>
+                  <li>2. Fill in your agent details</li>
+                  <li>3. ASTRAEUS will verify your /health and /execute endpoints</li>
+                  <li>4. Submit for review (typically approved within 24 hours)</li>
+                  <li>5. Once approved, your agent is live on the marketplace!</li>
+                </ol>
+              </div>
+
+              <div className="bg-white/5 rounded-xl p-6 border border-white/10 mb-6">
+                <h3 className="text-xl font-bold mb-4">Via API</h3>
+                <p className="text-white/70 mb-4">You can also register programmatically:</p>
+                <CodeBlock
+                  code={`curl -X POST https://web-production-3df46.up.railway.app/api/v1/agents \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "name": "My Agent",
+    "description": "Advanced data processing agent",
+    "endpoint_url": "https://my-agent.com",
+    "capabilities": ["data_processing", "analytics"],
+    "category": "Data",
+    "pricing_model": "per_request",
+    "price_per_request": 0.10
+  }'`}
+                  language="bash"
+                />
+              </div>
+
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-6 flex gap-4">
+                <div className="text-blue-400 text-2xl">ℹ️</div>
+                <div>
+                  <h3 className="font-bold text-blue-400 mb-2">Verification Process</h3>
+                  <p className="text-white/70 text-sm">
+                    ASTRAEUS will test your /health and /execute endpoints to ensure they're working correctly.
+                    Make sure your agent is deployed and accessible before registering.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-8 flex justify-between">
+                <button
+                  onClick={() => setActiveStep(1)}
+                  className="px-6 py-3 bg-white/10 hover:bg-white/20 rounded-lg font-bold"
+                >
+                  ← Back
+                </button>
+                <button
+                  onClick={() => setActiveStep(3)}
+                  className="px-6 py-3 bg-purple-600 hover:bg-purple-700 rounded-lg font-bold"
+                >
+                  Next: Set Pricing →
+                </button>
+              </div>
+            </section>
+          </div>
+        )}
+
+        {activeStep === 3 && (
+          <div className="space-y-8">
+            <section>
+              <h2 className="text-3xl font-black mb-4">Step 3: Set Pricing</h2>
+              <p className="text-white/70 text-lg mb-6">
+                Choose a pricing model that works for your agent and target audience.
+              </p>
+
+              <div className="grid md:grid-cols-2 gap-6 mb-8">
+                <div className="bg-white/5 rounded-xl p-6 border border-white/10">
+                  <h3 className="text-xl font-bold mb-3">Free Tier</h3>
+                  <p className="text-white/70 mb-4">Great for building trust and user base</p>
+                  <ul className="space-y-2 text-white/70 text-sm">
+                    <li>• ✅ High discoverability in marketplace</li>
+                    <li>• ✅ Users can try without commitment</li>
+                    <li>• ✅ Build reputation and reviews</li>
+                    <li>• ❌ No direct revenue</li>
+                  </ul>
+                  <div className="mt-6 p-4 bg-black/40 rounded-lg">
+                    <p className="text-2xl font-black">$0.00</p>
+                    <p className="text-white/50 text-sm">per request</p>
+                  </div>
+                </div>
+
+                <div className="bg-purple-600/10 rounded-xl p-6 border border-purple-500">
+                  <h3 className="text-xl font-bold mb-3">Pay-Per-Use</h3>
+                  <p className="text-white/70 mb-4">Recommended for premium agents</p>
+                  <ul className="space-y-2 text-white/70 text-sm">
+                    <li>• ✅ Earn credits for every execution</li>
+                    <li>• ✅ Fair pricing based on value</li>
+                    <li>• ✅ No subscription management</li>
+                    <li>• ✅ Platform handles billing</li>
+                  </ul>
+                  <div className="mt-6 p-4 bg-black/40 rounded-lg">
+                    <p className="text-2xl font-black">$0.01 - $1.00</p>
+                    <p className="text-white/50 text-sm">per request (you set the price)</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white/5 rounded-xl p-6 border border-white/10 mb-6">
+                <h3 className="text-xl font-bold mb-4">Pricing Strategies</h3>
+                <div className="space-y-4">
+                  <div>
+                    <p className="font-bold mb-1">💡 Start Free, Then Charge</p>
+                    <p className="text-white/50 text-sm">
+                      Launch as free to build user base and reviews, then introduce paid tier once you have traction
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-bold mb-1">⚡ Value-Based Pricing</p>
+                    <p className="text-white/50 text-sm">
+                      Price based on the value you deliver (e.g., expensive AI models, complex processing)
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-bold mb-1">📊 Competitive Analysis</p>
+                    <p className="text-white/50 text-sm">
+                      Browse similar agents on the marketplace to understand typical pricing
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-bold mb-1">🎯 Tiered Access</p>
+                    <p className="text-white/50 text-sm">
+                      Offer a free basic version and paid premium version with advanced features
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white/5 rounded-xl p-6 border border-white/10 mb-6">
+                <h3 className="text-xl font-bold mb-4">Example: Setting Your Price</h3>
+                <CodeBlock
+                  code={`{
+  "pricing_model": "per_request",
+  "price_per_request": 0.10,
+  "free_tier_limit": 10  // Optional: First 10 requests free per user
+}`}
+                  language="json"
+                />
+                <p className="text-white/50 text-sm mt-4">
+                  With a $0.10 per-request price, you earn $0.08 after platform fees (20%)
+                </p>
+              </div>
+
+              <div className="mt-8 flex justify-between">
+                <button
+                  onClick={() => setActiveStep(2)}
+                  className="px-6 py-3 bg-white/10 hover:bg-white/20 rounded-lg font-bold"
+                >
+                  ← Back
+                </button>
+                <button
+                  onClick={() => setActiveStep(4)}
+                  className="px-6 py-3 bg-purple-600 hover:bg-purple-700 rounded-lg font-bold"
+                >
+                  Next: Start Earning →
+                </button>
+              </div>
+            </section>
+          </div>
+        )}
+
+        {activeStep === 4 && (
+          <div className="space-y-8">
+            <section>
+              <h2 className="text-3xl font-black mb-4">Step 4: Start Earning</h2>
+              <p className="text-white/70 text-lg mb-6">
+                Your agent is live! Here's how to maximize discovery and earnings.
+              </p>
+
+              <div className="bg-gradient-to-r from-purple-600/20 to-blue-600/20 rounded-xl p-8 border border-purple-500/30 mb-8">
+                <h3 className="text-2xl font-bold mb-4">🎉 Congratulations!</h3>
+                <p className="text-white/70 mb-6">
+                  Your agent is now live on the ASTRAEUS marketplace. Users can discover and use your agent in their orchestrations.
+                </p>
+                <Link
+                  href="/marketplace"
+                  className="inline-block px-6 py-3 bg-purple-600 hover:bg-purple-700 rounded-lg font-bold"
+                >
+                  View Marketplace →
+                </Link>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-6 mb-8">
+                <div className="bg-white/5 rounded-xl p-6 border border-white/10">
+                  <h3 className="text-xl font-bold mb-4">📈 Increase Discovery</h3>
+                  <ul className="space-y-3 text-white/70">
+                    <li>• Write a detailed, keyword-rich description</li>
+                    <li>• Add relevant capability tags</li>
+                    <li>• Provide clear usage examples</li>
+                    <li>• Maintain high uptime and performance</li>
+                    <li>• Respond quickly to user feedback</li>
+                  </ul>
+                </div>
+
+                <div className="bg-white/5 rounded-xl p-6 border border-white/10">
+                  <h3 className="text-xl font-bold mb-4">⭐ Build Trust</h3>
+                  <ul className="space-y-3 text-white/70">
+                    <li>• Encourage satisfied users to leave reviews</li>
+                    <li>• Keep your agent updated and bug-free</li>
+                    <li>• Provide excellent documentation</li>
+                    <li>• Offer responsive support</li>
+                    <li>• Share success stories</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="bg-white/5 rounded-xl p-6 border border-white/10 mb-6">
+                <h3 className="text-xl font-bold mb-4">Monitor Performance</h3>
+                <p className="text-white/70 mb-4">Track your agent's success with built-in analytics:</p>
+                <ul className="space-y-3 text-white/70">
+                  <li>• <strong>Usage Metrics:</strong> Total API calls, active users, error rates</li>
+                  <li>• <strong>Revenue Dashboard:</strong> Earnings, transaction history, payout status</li>
+                  <li>• <strong>Performance Monitoring:</strong> Response times, uptime, success rates</li>
+                  <li>• <strong>User Feedback:</strong> Ratings, reviews, feature requests</li>
+                </ul>
+                <div className="mt-6">
+                  <Link
+                    href="/my-agents"
+                    className="inline-block px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-medium"
+                  >
+                    View Agent Analytics →
                   </Link>
                 </div>
               </div>
-            </aside>
 
-            <div className="col-span-12 lg:col-span-9 space-y-12">
-              <section className="flex flex-col gap-4 p-6 border border-[#1C1C1E] bg-[#1C1C1E]/20 rounded-lg" id="overview">
-                <h2 className="text-white text-2xl font-bold leading-tight tracking-[-0.015em]">1. Introduction & Protocol Overview</h2>
-                <p className="text-[#EAEAEA]/80 text-base font-normal leading-normal">Hermes is an advanced A2A (Agent-to-Agent) orchestration platform. It provides the infrastructure for creating, managing, and deploying autonomous agents that can communicate and collaborate securely. This guide will walk you through building your first agent, from initial setup to deployment.</p>
-                <div className="mt-4 p-6 bg-background-dark border border-[#1C1C1E] rounded-lg">
-                  <h3 className="text-lg font-bold mb-4">A2A Communication Flow</h3>
-                  <div className="flex items-center justify-around text-center text-sm">
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="p-3 rounded-full border-2 border-[#00B8D4] bg-[#00B8D4]/10"><BrainCircuit className="text-[#00B8D4] w-8 h-8" /></div>
-                      <p>Agent A</p>
-                    </div>
-                    <div className="flex-1 border-t-2 border-dashed border-white/20 mx-4"></div>
-                    <div className="flex flex-col items-center gap-2 text-primary">
-                      <div className="p-3 rounded-full border-2 border-primary bg-primary/10"><Network className="w-8 h-8" /></div>
-                      <p>Hermes<br/>Orchestrator</p>
-                    </div>
-                    <div className="flex-1 border-t-2 border-dashed border-white/20 mx-4"></div>
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="p-3 rounded-full border-2 border-[#00B8D4] bg-[#00B8D4]/10"><GitBranchPlus className="text-[#00B8D4] w-8 h-8" /></div>
-                      <p>Agent B</p>
-                    </div>
-                  </div>
+              <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-6 flex gap-4 mb-8">
+                <div className="text-green-400 text-2xl">💰</div>
+                <div>
+                  <h3 className="font-bold text-green-400 mb-2">Earnings & Payouts</h3>
+                  <p className="text-white/70 text-sm mb-3">
+                    Earnings are automatically tracked. You keep 80% of revenue (20% platform fee).
+                  </p>
+                  <p className="text-white/70 text-sm">
+                    Payouts are processed monthly for balances over $50. Configure payout method in your settings.
+                  </p>
                 </div>
-              </section>
+              </div>
 
-              <section className="flex flex-col gap-4 p-6 border border-[#1C1C1E] bg-[#1C1C1E]/20 rounded-lg" id="setup">
-                <h2 className="text-white text-2xl font-bold leading-tight tracking-[-0.015em]">2. Setup: SDK Installation</h2>
-                <p className="text-[#EAEAEA]/80 text-base font-normal leading-normal">Before you begin, ensure you have the necessary prerequisites installed on your system. The Hermes SDK is available via pip.</p>
-                <div className="my-4 space-y-3">
-                  <label className="flex items-center gap-3 cursor-pointer"><input className="w-5 h-5 rounded bg-transparent border-white/30 text-primary focus:ring-primary focus:ring-offset-background-dark" type="checkbox"/><span className="text-white">Python 3.9+</span></label>
-                  <label className="flex items-center gap-3 cursor-pointer"><input className="w-5 h-5 rounded bg-transparent border-white/30 text-primary focus:ring-primary focus:ring-offset-background-dark" type="checkbox"/><span className="text-white">pip & venv</span></label>
-                </div>
-                <CodeBlock code="$ pip install hermes-sdk" language="bash" />
-                <div className="mt-4 flex items-start gap-3 p-4 rounded-lg bg-primary/10 border border-primary/50 text-primary">
-                  <Info className="mt-1 w-5 h-5" />
-                  <p className="text-sm">It is highly recommended to install the SDK within a Python virtual environment to avoid dependency conflicts.</p>
-                </div>
-              </section>
-
-              <section className="flex flex-col gap-4 p-6 border border-[#1C1C1E] bg-[#1C1C1E]/20 rounded-lg" id="develop">
-                <h2 className="text-white text-2xl font-bold leading-tight tracking-[-0.015em]">3. Develop: Agent Workflow</h2>
-                <p className="text-[#EAEAEA]/80 text-base font-normal leading-normal">Creating an agent involves defining its behavior, building its capabilities, and registering it with the platform. Here is a minimal "Hello, World" agent example.</p>
-                <CodeBlock code={pythonCode} language="python" />
-              </section>
-
-              <section className="flex flex-col gap-4 p-6 border border-[#1C1C1E] bg-[#1C1C1E]/20 rounded-lg" id="test">
-                <h2 className="text-white text-2xl font-bold leading-tight tracking-[-0.015em]">4. Test & Deploy</h2>
-                <p className="text-[#EAEAEA]/80 text-base font-normal leading-normal">Use the Hermes CLI to test your agent locally before deploying it to the platform. Save your agent code as `agent.py` and run the following command.</p>
-                <CodeBlock code={`$ hermes test agent.py --payload '{"message": "ping"}'`} language="bash" />
-                <p className="text-[#EAEAEA]/80 text-base font-normal leading-normal pt-4">Once you are satisfied with its behavior, you can register and deploy your agent using the console or the CLI.</p>
-              </section>
-
-              <section className="flex flex-col gap-4 p-6 border border-[#1C1C1E] bg-[#1C1C1E]/20 rounded-lg" id="next-steps">
-                <h2 className="text-white text-2xl font-bold leading-tight tracking-[-0.015em]">Next Steps</h2>
-                <p className="text-[#EAEAEA]/80 text-base font-normal leading-normal">You've built your first agent! Now you're ready to explore more advanced topics and build more complex automations.</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                  <Link className="group flex flex-col gap-1 p-4 rounded-lg border border-[#1C1C1E] hover:border-primary/50 hover:bg-primary/10 transition-all" href="#">
-                    <h3 className="text-base font-bold text-white group-hover:text-primary">Full Documentation</h3>
-                    <p className="text-sm text-white/70">Dive deep into the Hermes SDK and platform features.</p>
+              <div className="bg-white/5 rounded-xl p-6 border border-white/10">
+                <h3 className="text-xl font-bold mb-4">Next Steps</h3>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <Link
+                    href="/developer/api-docs"
+                    className="p-4 rounded-lg border border-white/10 hover:border-purple-500 hover:bg-purple-600/10 transition-all"
+                  >
+                    <h4 className="font-bold mb-1">📚 API Documentation</h4>
+                    <p className="text-white/50 text-sm">Deep dive into the full API reference</p>
                   </Link>
-                  <Link className="group flex flex-col gap-1 p-4 rounded-lg border border-[#1C1C1E] hover:border-primary/50 hover:bg-primary/10 transition-all" href="#">
-                    <h3 className="text-base font-bold text-white group-hover:text-primary">API Reference</h3>
-                    <p className="text-sm text-white/70">Explore all available classes, methods, and functions.</p>
+                  <Link
+                    href="/my-agents"
+                    className="p-4 rounded-lg border border-white/10 hover:border-purple-500 hover:bg-purple-600/10 transition-all"
+                  >
+                    <h4 className="font-bold mb-1">🎯 Manage Agents</h4>
+                    <p className="text-white/50 text-sm">View analytics and update settings</p>
                   </Link>
-                  <Link className="group flex flex-col gap-1 p-4 rounded-lg border border-[#1C1C1E] hover:border-primary/50 hover:bg-primary/10 transition-all" href="#">
-                    <h3 className="text-base font-bold text-white group-hover:text-primary">Agent Examples</h3>
-                    <p className="text-sm text-white/70">Browse a library of pre-built agents for inspiration.</p>
+                  <Link
+                    href="/marketplace"
+                    className="p-4 rounded-lg border border-white/10 hover:border-purple-500 hover:bg-purple-600/10 transition-all"
+                  >
+                    <h4 className="font-bold mb-1">🔍 Browse Marketplace</h4>
+                    <p className="text-white/50 text-sm">See how other agents are positioned</p>
                   </Link>
-                  <Link className="group flex flex-col gap-1 p-4 rounded-lg border border-[#1C1C1E] hover:border-primary/50 hover:bg-primary/10 transition-all" href="#">
-                    <h3 className="text-base font-bold text-white group-hover:text-primary">Community Forum</h3>
-                    <p className="text-sm text-white/70">Join the discussion and get help from other developers.</p>
+                  <Link
+                    href="/developer"
+                    className="p-4 rounded-lg border border-white/10 hover:border-purple-500 hover:bg-purple-600/10 transition-all"
+                  >
+                    <h4 className="font-bold mb-1">🛠️ Developer Hub</h4>
+                    <p className="text-white/50 text-sm">Access all developer resources</p>
                   </Link>
                 </div>
-              </section>
-            </div>
+              </div>
+
+              <div className="mt-8 flex justify-between">
+                <button
+                  onClick={() => setActiveStep(3)}
+                  className="px-6 py-3 bg-white/10 hover:bg-white/20 rounded-lg font-bold"
+                >
+                  ← Back
+                </button>
+                <Link
+                  href="/my-agents/create"
+                  className="px-6 py-3 bg-purple-600 hover:bg-purple-700 rounded-lg font-bold inline-flex items-center gap-2"
+                >
+                  <Rocket className="w-4 h-4" />
+                  Publish Your Agent
+                </Link>
+              </div>
+            </section>
           </div>
-        </div>
+        )}
       </main>
 
-      <footer className="mt-24 py-8 px-6 border-t border-[#1C1C1E]">
-        <div className="max-w-7xl mx-auto text-center text-sm text-white/50">
-          © 2024 Hermes Protocol. All rights reserved.
+      <footer className="border-t border-white/10 p-6 mt-24">
+        <div className="max-w-7xl mx-auto text-center text-white/50 text-sm">
+          © 2025 ASTRAEUS. All rights reserved.
         </div>
       </footer>
     </div>

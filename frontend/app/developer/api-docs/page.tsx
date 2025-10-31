@@ -2,21 +2,20 @@
 
 import Link from "next/link"
 import { useState } from "react"
-import { 
-  Search, 
-  PlayCircle, 
-  Key, 
-  Gauge, 
-  Bot, 
-  Share, 
-  Waves, 
-  FileCode, 
-  FileJson, 
-  AlertTriangle, 
+import {
+  Search,
+  PlayCircle,
+  Key,
+  Gauge,
+  Bot,
+  Share,
+  Waves,
+  FileCode,
+  FileJson,
+  AlertTriangle,
   Copy,
   Book,
-  GitCompare,
-  Package
+  GitCompare
 } from "lucide-react"
 
 const CodeBlock = ({ code, language }: { code: string, language: string }) => {
@@ -29,196 +28,496 @@ const CodeBlock = ({ code, language }: { code: string, language: string }) => {
   }
 
   return (
-    <div className="mt-4 relative bg-surface-dark rounded-xl p-4">
-      <button onClick={handleCopy} className="absolute top-3 right-3 text-text-muted-dark hover:text-white transition-colors">
-        <Copy className="w-4 h-4" />
+    <div className="mt-4 relative bg-black/40 rounded-xl p-4 border border-white/5">
+      <button
+        onClick={handleCopy}
+        className="absolute top-3 right-3 text-white/50 hover:text-white transition-colors"
+      >
+        {copied ? "✓" : <Copy className="w-4 h-4" />}
       </button>
-      <pre className="text-sm code-highlight overflow-x-auto"><code className={`language-${language}`}>{code}</code></pre>
+      <pre className="text-sm overflow-x-auto"><code className={`text-gray-300`}>{code}</code></pre>
     </div>
   )
 }
 
 export default function ApiDocsPage() {
-  const curlCode = `curl --request POST -L \\
-  --url 'https://api.hermes.io/v1/agents' \\
-  --header 'Authorization: Bearer <api_key>' \\
-  --header 'Content-Type: application/json' \\
-  --data '{
-    "name": "data-processor-01",
-    "type": "data_processor",
-    "config": {
-      "retries": 3,
-      "timeout": 60
-    }
-  }'`
+  const [activeSection, setActiveSection] = useState("getting-started")
 
-  const successResponse = `{
-  "agent_id": "agt-1a2b3c4d5e6f",
-  "name": "data-processor-01",
-  "status": "registered",
-  "created_at": "2023-10-27T10:00:00Z"
-}`
+  const sections = {
+    "getting-started": {
+      title: "Getting Started",
+      icon: <PlayCircle className="w-5 h-5" />,
+      content: (
+        <>
+          <h1 className="text-4xl font-black mb-4">Getting Started</h1>
+          <p className="text-white/70 text-lg mb-6">
+            Welcome to the ASTRAEUS API. This guide will help you integrate with our multi-agent orchestration platform.
+          </p>
+
+          <h2 className="text-2xl font-bold mt-8 mb-4">Base URL</h2>
+          <CodeBlock code="https://web-production-3df46.up.railway.app/api/v1" language="text" />
+
+          <h2 className="text-2xl font-bold mt-8 mb-4">Quick Start</h2>
+          <div className="space-y-4 text-white/70">
+            <p>1. <strong className="text-white">Register an account</strong> at the ASTRAEUS platform</p>
+            <p>2. <strong className="text-white">Generate an API key</strong> from your dashboard</p>
+            <p>3. <strong className="text-white">Install the SDK</strong> or use direct HTTP requests</p>
+            <p>4. <strong className="text-white">Make your first API call</strong></p>
+          </div>
+
+          <h2 className="text-2xl font-bold mt-8 mb-4">SDK Installation</h2>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm text-white/50 mb-2">Python</p>
+              <CodeBlock code="pip install astraeus-sdk" language="bash" />
+            </div>
+            <div>
+              <p className="text-sm text-white/50 mb-2">Node.js</p>
+              <CodeBlock code="npm install @astraeus/sdk" language="bash" />
+            </div>
+          </div>
+        </>
+      )
+    },
+    "authentication": {
+      title: "Authentication",
+      icon: <Key className="w-5 h-5" />,
+      content: (
+        <>
+          <h1 className="text-4xl font-black mb-4">Authentication</h1>
+          <p className="text-white/70 text-lg mb-6">
+            All API requests require authentication using an API key in the Authorization header.
+          </p>
+
+          <h2 className="text-2xl font-bold mt-8 mb-4">API Keys</h2>
+          <p className="text-white/70 mb-4">
+            Generate API keys from your dashboard. Include your API key in the Authorization header:
+          </p>
+          <CodeBlock code="Authorization: Bearer YOUR_API_KEY" language="text" />
+
+          <h2 className="text-2xl font-bold mt-8 mb-4">Example Request</h2>
+          <CodeBlock
+            code={`curl -X GET https://web-production-3df46.up.railway.app/api/v1/marketplace \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Content-Type: application/json"`}
+            language="bash"
+          />
+
+          <div className="mt-6 bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 flex gap-3">
+            <AlertTriangle className="text-yellow-400 w-5 h-5 mt-0.5 flex-shrink-0" />
+            <div>
+              <h3 className="font-bold text-yellow-400">Security Best Practices</h3>
+              <ul className="text-white/70 text-sm mt-2 space-y-1">
+                <li>• Never share your API keys publicly</li>
+                <li>• Rotate keys regularly</li>
+                <li>• Use environment variables for keys</li>
+                <li>• Delete unused keys immediately</li>
+              </ul>
+            </div>
+          </div>
+        </>
+      )
+    },
+    "rate-limits": {
+      title: "Rate Limits",
+      icon: <Gauge className="w-5 h-5" />,
+      content: (
+        <>
+          <h1 className="text-4xl font-black mb-4">Rate Limits</h1>
+          <p className="text-white/70 text-lg mb-6">
+            API rate limits ensure fair usage and system stability.
+          </p>
+
+          <h2 className="text-2xl font-bold mt-8 mb-4">Default Limits</h2>
+          <div className="grid md:grid-cols-3 gap-4">
+            <div className="bg-white/5 rounded-xl p-6 border border-white/10">
+              <h3 className="text-xl font-bold mb-2">Free Tier</h3>
+              <p className="text-3xl font-black text-purple-400">100</p>
+              <p className="text-white/50 text-sm">requests per hour</p>
+            </div>
+            <div className="bg-white/5 rounded-xl p-6 border border-white/10">
+              <h3 className="text-xl font-bold mb-2">Pro Tier</h3>
+              <p className="text-3xl font-black text-purple-400">1,000</p>
+              <p className="text-white/50 text-sm">requests per hour</p>
+            </div>
+            <div className="bg-white/5 rounded-xl p-6 border border-white/10">
+              <h3 className="text-xl font-bold mb-2">Enterprise</h3>
+              <p className="text-3xl font-black text-purple-400">Custom</p>
+              <p className="text-white/50 text-sm">contact sales</p>
+            </div>
+          </div>
+
+          <h2 className="text-2xl font-bold mt-8 mb-4">Rate Limit Headers</h2>
+          <p className="text-white/70 mb-4">Every API response includes rate limit information:</p>
+          <CodeBlock
+            code={`X-RateLimit-Limit: 1000
+X-RateLimit-Remaining: 987
+X-RateLimit-Reset: 1640995200`}
+            language="text"
+          />
+
+          <h2 className="text-2xl font-bold mt-8 mb-4">429 Too Many Requests</h2>
+          <p className="text-white/70 mb-4">If you exceed the rate limit, you'll receive a 429 error:</p>
+          <CodeBlock
+            code={`{
+  "error": {
+    "code": "rate_limit_exceeded",
+    "message": "Too many requests. Please try again later.",
+    "retry_after": 3600
+  }
+}`}
+            language="json"
+          />
+        </>
+      )
+    },
+    "agents": {
+      title: "Agent Management",
+      icon: <Bot className="w-5 h-5" />,
+      content: (
+        <>
+          <h1 className="text-4xl font-black mb-4">Agent Management</h1>
+          <p className="text-white/70 text-lg mb-6">
+            Register, update, and manage AI agents on the ASTRAEUS platform.
+          </p>
+
+          <h2 className="text-2xl font-bold mt-8 mb-4 flex items-center gap-3">
+            <span className="px-3 py-1 bg-green-600 text-white rounded text-sm font-mono">POST</span>
+            Register Agent
+          </h2>
+          <p className="text-white/70 mb-4">Register a new agent on the marketplace.</p>
+          <CodeBlock
+            code={`POST /api/v1/agents
+
+{
+  "name": "Data Processor Pro",
+  "description": "Advanced data processing agent",
+  "endpoint_url": "https://your-agent.com/execute",
+  "capabilities": ["data_processing", "analytics"],
+  "pricing_model": "per_request",
+  "price_per_request": 0.10
+}`}
+            language="json"
+          />
+
+          <h3 className="text-xl font-bold mt-6 mb-3">Response</h3>
+          <CodeBlock
+            code={`{
+  "agent_id": "agt_abc123",
+  "name": "Data Processor Pro",
+  "status": "active",
+  "api_key": "sk_live_xyz789",
+  "created_at": "2025-10-31T10:00:00Z"
+}`}
+            language="json"
+          />
+
+          <h2 className="text-2xl font-bold mt-8 mb-4 flex items-center gap-3">
+            <span className="px-3 py-1 bg-blue-600 text-white rounded text-sm font-mono">GET</span>
+            List Agents
+          </h2>
+          <CodeBlock code="GET /api/v1/agents?limit=10&offset=0" language="text" />
+
+          <h2 className="text-2xl font-bold mt-8 mb-4 flex items-center gap-3">
+            <span className="px-3 py-1 bg-yellow-600 text-white rounded text-sm font-mono">PATCH</span>
+            Update Agent
+          </h2>
+          <CodeBlock
+            code={`PATCH /api/v1/agents/{agent_id}
+
+{
+  "description": "Updated description",
+  "price_per_request": 0.15
+}`}
+            language="json"
+          />
+
+          <h2 className="text-2xl font-bold mt-8 mb-4 flex items-center gap-3">
+            <span className="px-3 py-1 bg-red-600 text-white rounded text-sm font-mono">DELETE</span>
+            Delete Agent
+          </h2>
+          <CodeBlock code="DELETE /api/v1/agents/{agent_id}" language="text" />
+        </>
+      )
+    },
+    "orchestration": {
+      title: "Orchestration",
+      icon: <Share className="w-5 h-5" />,
+      content: (
+        <>
+          <h1 className="text-4xl font-black mb-4">Task Orchestration</h1>
+          <p className="text-white/70 text-lg mb-6">
+            Create and manage multi-agent orchestrations to solve complex tasks.
+          </p>
+
+          <h2 className="text-2xl font-bold mt-8 mb-4 flex items-center gap-3">
+            <span className="px-3 py-1 bg-green-600 text-white rounded text-sm font-mono">POST</span>
+            Create Orchestration
+          </h2>
+          <p className="text-white/70 mb-4">Create a new multi-agent orchestration workflow.</p>
+          <CodeBlock
+            code={`POST /api/v1/orchestrations
+
+{
+  "name": "Data Analysis Pipeline",
+  "description": "Extract, analyze, and visualize data",
+  "agents": [
+    {
+      "agent_id": "agt_extractor",
+      "order": 1,
+      "config": {"format": "json"}
+    },
+    {
+      "agent_id": "agt_analyzer",
+      "order": 2,
+      "config": {"method": "statistical"}
+    }
+  ],
+  "input": {
+    "data_source": "https://api.example.com/data"
+  }
+}`}
+            language="json"
+          />
+
+          <h3 className="text-xl font-bold mt-6 mb-3">Response</h3>
+          <CodeBlock
+            code={`{
+  "orchestration_id": "orc_def456",
+  "status": "running",
+  "created_at": "2025-10-31T10:00:00Z",
+  "estimated_completion": "2025-10-31T10:05:00Z"
+}`}
+            language="json"
+          />
+
+          <h2 className="text-2xl font-bold mt-8 mb-4 flex items-center gap-3">
+            <span className="px-3 py-1 bg-blue-600 text-white rounded text-sm font-mono">GET</span>
+            Get Orchestration Status
+          </h2>
+          <CodeBlock code="GET /api/v1/orchestrations/{orchestration_id}" language="text" />
+
+          <h3 className="text-xl font-bold mt-6 mb-3">Response</h3>
+          <CodeBlock
+            code={`{
+  "orchestration_id": "orc_def456",
+  "status": "completed",
+  "agents": [
+    {
+      "agent_id": "agt_extractor",
+      "status": "completed",
+      "output": {...}
+    },
+    {
+      "agent_id": "agt_analyzer",
+      "status": "completed",
+      "output": {...}
+    }
+  ],
+  "final_output": {...},
+  "credits_used": 2.5
+}`}
+            language="json"
+          />
+        </>
+      )
+    },
+    "webhooks": {
+      title: "Webhooks",
+      icon: <Waves className="w-5 h-5" />,
+      content: (
+        <>
+          <h1 className="text-4xl font-black mb-4">Webhooks</h1>
+          <p className="text-white/70 text-lg mb-6">
+            Receive real-time notifications about orchestration events.
+          </p>
+
+          <h2 className="text-2xl font-bold mt-8 mb-4">Event Types</h2>
+          <div className="space-y-3">
+            <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+              <p className="font-mono font-bold">orchestration.started</p>
+              <p className="text-white/50 text-sm">Orchestration execution has begun</p>
+            </div>
+            <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+              <p className="font-mono font-bold">orchestration.completed</p>
+              <p className="text-white/50 text-sm">Orchestration finished successfully</p>
+            </div>
+            <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+              <p className="font-mono font-bold">orchestration.failed</p>
+              <p className="text-white/50 text-sm">Orchestration encountered an error</p>
+            </div>
+            <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+              <p className="font-mono font-bold">agent.execution.completed</p>
+              <p className="text-white/50 text-sm">Individual agent completed its task</p>
+            </div>
+          </div>
+
+          <h2 className="text-2xl font-bold mt-8 mb-4">Webhook Payload</h2>
+          <CodeBlock
+            code={`{
+  "event": "orchestration.completed",
+  "timestamp": "2025-10-31T10:05:00Z",
+  "data": {
+    "orchestration_id": "orc_def456",
+    "status": "completed",
+    "output": {...},
+    "credits_used": 2.5
+  }
+}`}
+            language="json"
+          />
+
+          <h2 className="text-2xl font-bold mt-8 mb-4">Configuring Webhooks</h2>
+          <CodeBlock
+            code={`POST /api/v1/webhooks
+
+{
+  "url": "https://your-app.com/webhooks",
+  "events": ["orchestration.completed", "orchestration.failed"],
+  "secret": "whsec_your_secret_key"
+}`}
+            language="json"
+          />
+        </>
+      )
+    },
+    "errors": {
+      title: "Error Codes",
+      icon: <Book className="w-5 h-5" />,
+      content: (
+        <>
+          <h1 className="text-4xl font-black mb-4">Error Codes</h1>
+          <p className="text-white/70 text-lg mb-6">
+            Complete reference of API error codes and how to handle them.
+          </p>
+
+          <h2 className="text-2xl font-bold mt-8 mb-4">HTTP Status Codes</h2>
+          <div className="space-y-4">
+            <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+              <p className="font-mono font-bold text-green-400">200 OK</p>
+              <p className="text-white/50 text-sm">Request succeeded</p>
+            </div>
+            <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+              <p className="font-mono font-bold text-green-400">201 Created</p>
+              <p className="text-white/50 text-sm">Resource successfully created</p>
+            </div>
+            <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+              <p className="font-mono font-bold text-yellow-400">400 Bad Request</p>
+              <p className="text-white/50 text-sm">Invalid request parameters</p>
+            </div>
+            <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+              <p className="font-mono font-bold text-yellow-400">401 Unauthorized</p>
+              <p className="text-white/50 text-sm">Invalid or missing API key</p>
+            </div>
+            <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+              <p className="font-mono font-bold text-yellow-400">403 Forbidden</p>
+              <p className="text-white/50 text-sm">Insufficient permissions</p>
+            </div>
+            <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+              <p className="font-mono font-bold text-yellow-400">404 Not Found</p>
+              <p className="text-white/50 text-sm">Resource does not exist</p>
+            </div>
+            <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+              <p className="font-mono font-bold text-yellow-400">429 Too Many Requests</p>
+              <p className="text-white/50 text-sm">Rate limit exceeded</p>
+            </div>
+            <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+              <p className="font-mono font-bold text-red-400">500 Internal Server Error</p>
+              <p className="text-white/50 text-sm">Server encountered an error</p>
+            </div>
+          </div>
+
+          <h2 className="text-2xl font-bold mt-8 mb-4">Error Response Format</h2>
+          <CodeBlock
+            code={`{
+  "error": {
+    "code": "invalid_request",
+    "message": "Missing required field: agent_id",
+    "details": {
+      "field": "agent_id",
+      "reason": "required"
+    }
+  }
+}`}
+            language="json"
+          />
+        </>
+      )
+    }
+  }
 
   return (
-    <div className="flex min-h-screen font-display bg-background-dark text-text-light">
-      <aside className="w-72 flex-shrink-0 bg-black/30 border-r border-white/10 flex flex-col p-4 fixed h-full">
-        <div className="flex items-center gap-3 mb-6 px-3">
-          <div 
-            className="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10" 
-            style={{backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuAd0OsjIVn67sYrClEVWpvrcNLrXx2aMsNxcHaLiNvkFtyMi1fLPY7z2WhRKFpbEDTVWAjM3Fav9SZnGgIzUiqM0FSafICHVP_61Bh7ehst3CFKVRkQ_eUpJ9aWOw5KmweGaDsk-nU7mnSYhmFkGeqkveg1sq8Wd-HrYGCPQaK6xM7A7n250n6M2fzbimtzUVSS2JLrk3Pd4NjQ-ZwnFtqJLF2h6XYorIdLA_-MzuZuRcCdv6T-QQxrgxeCKab5ykFSYQyBkyjHGbyy")'}}
-          ></div>
-          <div className="flex flex-col">
-            <h1 className="text-white text-base font-medium leading-normal">Hermes</h1>
-            <p className="text-text-muted-dark text-sm font-normal leading-normal">A2A Orchestration</p>
+    <div className="flex min-h-screen bg-black text-white">
+      <aside className="w-72 flex-shrink-0 bg-black/50 border-r border-white/10 flex flex-col p-6 fixed h-full overflow-y-auto">
+        <Link href="/developer" className="flex items-center gap-3 mb-8">
+          <div className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center font-black">
+            A
           </div>
-        </div>
-        
-        <div className="mb-4">
-          <label className="flex flex-col min-w-40 h-11 w-full">
-            <div className="flex w-full flex-1 items-stretch rounded-lg h-full">
-              <div className="text-text-muted-dark flex border-none bg-surface-dark items-center justify-center pl-3 rounded-l-lg border-r-0">
-                <Search className="w-5 h-5" />
-              </div>
-              <input className="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-white focus:outline-0 focus:ring-0 border-none bg-surface-dark focus:border-none h-full placeholder:text-text-muted-dark px-4 rounded-l-none border-l-0 pl-2 text-sm font-normal leading-normal" placeholder="Search documentation..." />
-            </div>
-          </label>
-        </div>
+          <div>
+            <h1 className="text-white text-base font-bold">ASTRAEUS</h1>
+            <p className="text-white/50 text-xs">API Documentation</p>
+          </div>
+        </Link>
 
-        <nav className="flex-grow overflow-y-auto pr-2">
-          <div className="flex flex-col gap-1">
-            <Link href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-dark transition-colors duration-200">
-              <PlayCircle className="w-5 h-5 text-text-muted-dark" />
-              <p className="text-text-light text-sm font-medium leading-normal">Getting Started</p>
-            </Link>
-            <Link href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-dark transition-colors duration-200">
-              <Key className="w-5 h-5 text-text-muted-dark" />
-              <p className="text-text-light text-sm font-medium leading-normal">Authentication</p>
-            </Link>
-            <Link href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-dark transition-colors duration-200">
-              <Gauge className="w-5 h-5 text-text-muted-dark" />
-              <p className="text-text-light text-sm font-medium leading-normal">Rate Limits</p>
-            </Link>
-            <p className="text-text-muted-dark text-xs font-bold uppercase tracking-wider px-3 pt-6 pb-2">API Endpoints</p>
-            <Link href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg bg-primary/20 text-primary transition-colors duration-200">
-              <Bot className="w-5 h-5" />
-              <p className="text-primary text-sm font-bold leading-normal">Agent Management</p>
-            </Link>
-            <Link href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-dark transition-colors duration-200">
-              <Share className="w-5 h-5 text-text-muted-dark" />
-              <p className="text-text-light text-sm font-medium leading-normal">Task Orchestration</p>
-            </Link>
-            <Link href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-dark transition-colors duration-200">
-              <Waves className="w-5 h-5 text-text-muted-dark" />
-              <p className="text-text-light text-sm font-medium leading-normal">Data Streams</p>
-            </Link>
-            <p className="text-text-muted-dark text-xs font-bold uppercase tracking-wider px-3 pt-6 pb-2">SDK Modules</p>
-            <Link href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-dark transition-colors duration-200">
-              <FileCode className="w-5 h-5 text-text-muted-dark" />
-              <p className="text-text-light text-sm font-medium leading-normal">Python SDK</p>
-            </Link>
-            <Link href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-dark transition-colors duration-200">
-              <FileJson className="w-5 h-5 text-text-muted-dark" />
-              <p className="text-text-light text-sm font-medium leading-normal">JavaScript SDK</p>
-            </Link>
-            <p className="text-text-muted-dark text-xs font-bold uppercase tracking-wider px-3 pt-6 pb-2">Reference</p>
-            <Link href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-dark transition-colors duration-200">
-              <Book className="w-5 h-5 text-text-muted-dark" />
-              <p className="text-text-light text-sm font-medium leading-normal">Error Codes</p>
-            </Link>
-            <Link href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-dark transition-colors duration-200">
-              <GitCompare className="w-5 h-5 text-text-muted-dark" />
-              <p className="text-text-light text-sm font-medium leading-normal">Responses</p>
-            </Link>
-          </div>
+        <nav className="flex-grow space-y-1">
+          <p className="text-white/40 text-xs font-bold uppercase tracking-wider px-3 py-2">
+            Getting Started
+          </p>
+          {["getting-started", "authentication", "rate-limits"].map((key) => (
+            <button
+              key={key}
+              onClick={() => setActiveSection(key)}
+              className={`flex items-center gap-3 px-3 py-2 rounded-lg w-full text-left transition-colors ${
+                activeSection === key
+                  ? "bg-purple-600 text-white"
+                  : "text-white/70 hover:bg-white/5"
+              }`}
+            >
+              {sections[key as keyof typeof sections].icon}
+              <span className="text-sm font-medium">{sections[key as keyof typeof sections].title}</span>
+            </button>
+          ))}
+
+          <p className="text-white/40 text-xs font-bold uppercase tracking-wider px-3 py-2 pt-6">
+            API Endpoints
+          </p>
+          {["agents", "orchestration", "webhooks"].map((key) => (
+            <button
+              key={key}
+              onClick={() => setActiveSection(key)}
+              className={`flex items-center gap-3 px-3 py-2 rounded-lg w-full text-left transition-colors ${
+                activeSection === key
+                  ? "bg-purple-600 text-white"
+                  : "text-white/70 hover:bg-white/5"
+              }`}
+            >
+              {sections[key as keyof typeof sections].icon}
+              <span className="text-sm font-medium">{sections[key as keyof typeof sections].title}</span>
+            </button>
+          ))}
+
+          <p className="text-white/40 text-xs font-bold uppercase tracking-wider px-3 py-2 pt-6">
+            Reference
+          </p>
+          {["errors"].map((key) => (
+            <button
+              key={key}
+              onClick={() => setActiveSection(key)}
+              className={`flex items-center gap-3 px-3 py-2 rounded-lg w-full text-left transition-colors ${
+                activeSection === key
+                  ? "bg-purple-600 text-white"
+                  : "text-white/70 hover:bg-white/5"
+              }`}
+            >
+              {sections[key as keyof typeof sections].icon}
+              <span className="text-sm font-medium">{sections[key as keyof typeof sections].title}</span>
+            </button>
+          ))}
         </nav>
       </aside>
 
-      <main className="ml-72 flex-1 p-8 lg:p-12">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex flex-wrap gap-2 mb-6">
-            <Link className="text-text-muted-dark text-sm font-medium leading-normal hover:text-text-light" href="#">API Endpoints</Link>
-            <span className="text-text-muted-dark text-sm font-medium leading-normal">/</span>
-            <Link className="text-text-muted-dark text-sm font-medium leading-normal hover:text-text-light" href="#">Agent Management</Link>
-            <span className="text-text-muted-dark text-sm font-medium leading-normal">/</span>
-            <span className="text-white text-sm font-medium leading-normal">Create Agent</span>
-          </div>
-
-          <header className="mb-10">
-            <p className="text-primary font-mono text-lg font-medium mb-1">POST</p>
-            <h1 className="text-white text-4xl font-black leading-tight tracking-[-0.033em] font-mono">/v1/agents</h1>
-            <p className="text-text-muted-dark text-base font-normal leading-normal mt-3 max-w-2xl">
-              Creates a new agent instance within the platform. This endpoint registers the agent and prepares it for task assignment.
-            </p>
-          </header>
-
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-12">
-            <div className="lg:col-span-3 space-y-12">
-              <section>
-                <h2 className="text-2xl font-bold text-white border-b border-white/10 pb-3 mb-4">Request Body</h2>
-                <div className="space-y-4">
-                  <div className="font-mono">
-                    <p className="text-text-light"><span className="font-bold">name</span> <span className="text-primary">string</span> <span className="text-text-muted-dark">required</span></p>
-                    <p className="text-text-muted-dark pl-4">A unique identifier for the agent.</p>
-                  </div>
-                  <div className="font-mono">
-                    <p className="text-text-light"><span className="font-bold">type</span> <span className="text-primary">string</span> <span className="text-text-muted-dark">required</span></p>
-                    <p className="text-text-muted-dark pl-4">Specifies the agent's capability (e.g., "data_processor", "alert_monitor").</p>
-                  </div>
-                  <div className="font-mono">
-                    <p className="text-text-light"><span className="font-bold">config</span> <span className="text-primary">object</span></p>
-                    <p className="text-text-muted-dark pl-4">A JSON object containing agent-specific configuration.</p>
-                  </div>
-                </div>
-              </section>
-
-              <div className="flex items-start gap-4 p-4 rounded-lg bg-primary/10 border border-primary/30">
-                <AlertTriangle className="text-primary mt-1 w-5 h-5" />
-                <div>
-                  <h3 className="font-bold text-white">Security Notice</h3>
-                  <p className="text-text-muted-dark text-sm">Agent names must be unique across your organization. Duplicate names will result in a <code className="bg-surface-dark px-1.5 py-0.5 rounded text-primary">409 Conflict</code> error.</p>
-                </div>
-              </div>
-
-              <section>
-                <h2 className="text-2xl font-bold text-white border-b border-white/10 pb-3 mb-4">Responses</h2>
-                <div className="space-y-4 font-mono">
-                  <div>
-                    <p><span className="bg-green-500/20 text-green-400 font-bold px-2 py-1 rounded-md text-sm">201 Created</span> - Agent successfully created.</p>
-                  </div>
-                  <div>
-                    <p><span className="bg-yellow-500/20 text-yellow-400 font-bold px-2 py-1 rounded-md text-sm">400 Bad Request</span> - Invalid request body.</p>
-                  </div>
-                  <div>
-                    <p><span className="bg-red-500/20 text-red-400 font-bold px-2 py-1 rounded-md text-sm">409 Conflict</span> - An agent with this name already exists.</p>
-                  </div>
-                </div>
-              </section>
-            </div>
-
-            <div className="lg:col-span-2">
-              <div className="sticky top-12">
-                <div>
-                  <div className="flex border-b border-white/10 gap-6">
-                    <a className="flex flex-col items-center justify-center border-b-[3px] border-b-primary text-white pb-3 pt-2" href="#">
-                      <p className="text-white text-sm font-bold leading-normal">cURL</p>
-                    </a>
-                    <a className="flex flex-col items-center justify-center border-b-[3px] border-b-transparent text-text-muted-dark pb-3 pt-2 hover:text-white" href="#">
-                      <p className="text-sm font-bold leading-normal">Python</p>
-                    </a>
-                    <a className="flex flex-col items-center justify-center border-b-[3-px] border-b-transparent text-text-muted-dark pb-3 pt-2 hover:text-white" href="#">
-                      <p className="text-sm font-bold leading-normal">Node.js</p>
-                    </a>
-                  </div>
-                </div>
-                
-                <CodeBlock code={curlCode} language="bash" />
-
-                <p className="text-text-muted-dark text-sm mt-6 font-semibold">SUCCESS RESPONSE</p>
-                <CodeBlock code={successResponse} language="json" />
-              </div>
-            </div>
-          </div>
-        </div>
+      <main className="ml-72 flex-1 p-12 max-w-5xl">
+        {sections[activeSection as keyof typeof sections].content}
       </main>
     </div>
   )
