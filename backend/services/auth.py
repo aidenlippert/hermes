@@ -32,18 +32,60 @@ class AuthService:
     """Authentication and authorization service"""
 
     @staticmethod
+    def validate_password(password: str) -> None:
+        """Validate password meets requirements
+
+        Raises:
+            ValueError: If password is invalid
+        """
+        if not password:
+            raise ValueError("Password cannot be empty")
+
+        # Check byte length (bcrypt limit is 72 bytes)
+        password_bytes = password.encode('utf-8')
+        if len(password_bytes) > 72:
+            raise ValueError(
+                f"Password is too long ({len(password_bytes)} bytes). "
+                "Maximum is 72 bytes. Please use a shorter password."
+            )
+
+        # Minimum length
+        if len(password) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+
+    @staticmethod
     def hash_password(password: str) -> str:
-        """Hash a password (bcrypt has 72 byte limit)"""
-        # Truncate to 72 bytes for bcrypt compatibility
-        password_bytes = password.encode('utf-8')[:72]
-        return pwd_context.hash(password_bytes.decode('utf-8', errors='ignore'))
+        """Hash a password after validation
+
+        Args:
+            password: Plain text password
+
+        Returns:
+            Bcrypt hashed password
+
+        Raises:
+            ValueError: If password fails validation
+        """
+        # Validate before hashing
+        AuthService.validate_password(password)
+        return pwd_context.hash(password)
 
     @staticmethod
     def verify_password(plain_password: str, hashed_password: str) -> bool:
-        """Verify a password against its hash"""
-        # Truncate to 72 bytes for bcrypt compatibility
-        password_bytes = plain_password.encode('utf-8')[:72]
-        return pwd_context.verify(password_bytes.decode('utf-8', errors='ignore'), hashed_password)
+        """Verify a password against its hash
+
+        Args:
+            plain_password: Password to verify
+            hashed_password: Bcrypt hash to check against
+
+        Returns:
+            True if password matches, False otherwise
+        """
+        try:
+            return pwd_context.verify(plain_password, hashed_password)
+        except Exception:
+            # If verification fails for any reason, return False
+            return False
 
     @staticmethod
     def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:

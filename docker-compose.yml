@@ -6,9 +6,9 @@ services:
     image: ankane/pgvector:latest
     container_name: hermes_postgres
     environment:
-      POSTGRES_USER: hermes
-      POSTGRES_PASSWORD: hermes_dev_password
-      POSTGRES_DB: hermes
+      POSTGRES_USER: ${POSTGRES_USER:-hermes}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hermes_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-hermes}
       POSTGRES_HOST_AUTH_METHOD: md5
     ports:
       - "5432:5432"
@@ -30,9 +30,9 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes --requirepass hermes_dev_password
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-hermes_dev_password}
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "hermes_dev_password", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-hermes_dev_password}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -43,8 +43,8 @@ services:
     image: dpage/pgadmin4:latest
     container_name: hermes_pgadmin
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@hermes.ai
-      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@hermes.ai}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
     ports:
       - "5050:80"
     depends_on:

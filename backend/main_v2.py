@@ -47,6 +47,7 @@ from backend.websocket.manager import manager
 from backend.api import v1_websocket
 from backend.services.reputation import recalculate_all_trust_scores
 from backend.database.connection import AsyncSessionLocal
+from backend.middleware.rate_limiter import create_rate_limit_middleware
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -64,12 +65,44 @@ app = FastAPI(
     version="2.0.0"
 )
 
-# CORS
+# CORS - Environment-based configuration
+def get_cors_origins() -> list:
+    """Get CORS allowed origins based on environment"""
+    env = os.getenv("HERMES_ENV", "development").lower()
+
+    if env in ("production", "prod"):
+        # Production: Only allow specific domains
+        allowed = os.getenv("CORS_ORIGINS", "").split(",")
+        origins = [origin.strip() for origin in allowed if origin.strip()]
+        if not origins:
+            logger.warning("Production environment but no CORS_ORIGINS set. Using restrictive defaults.")
+            origins = []
+        return origins
+    elif env in ("staging", "stage"):
+        # Staging: Allow staging domains
+        return [
+            "https://hermes-staging.vercel.app",
+            "http://localhost:3000",
+            "http://localhost:3001",
+        ]
+    else:
+        # Development: Allow localhost
+        return [
+            "http://localhost:3000",
+            "http://localhost:3001",
+            "http://localhost:8000",
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:8000",
+        ]
+
+cors_origins = get_cors_origins()
+logger.info(f"CORS enabled for origins: {cors_origins}")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -91,8 +124,14 @@ app.include_router(workflows_api.router, prefix="/api/v1", tags=["Workflows"])
 # Security
 security = HTTPBearer()
 
-# API Key
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "AIzaSyAOceA7tUW7cPenJol4pyOcNyTBpa_a5cg")
+# API Key - REQUIRED
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+if not GOOGLE_API_KEY:
+    logger.error("GOOGLE_API_KEY environment variable is required but not set")
+    raise RuntimeError(
+        "Missing required environment variable: GOOGLE_API_KEY. "
+        "Please set it in your .env file or environment."
+    )
 
 # Initialize components
 a2a_client = A2AClient()
@@ -180,11 +219,12 @@ class RegisterRequest(BaseModel):
 
     @field_validator('password')
     @classmethod
-    def truncate_password(cls, v):
-        """Truncate password to 72 bytes for bcrypt"""
-        if isinstance(v, str):
-            password_bytes = v.encode('utf-8')[:72]
-            return password_bytes.decode('utf-8', errors='ignore')
+    def validate_password(cls, v):
+        \"\"\"Validate password requirements\"\"\"
+        if not v or len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        if len(v.encode('utf-8')) > 72:
+            raise ValueError("Password is too long (max 72 bytes)")
         return v
 
 
@@ -1113,16 +1153,29 @@ async def startup():
             raise
 
         # Initialize Redis with timeout
+        redis_client = None
         try:
-            await asyncio.wait_for(init_redis(), timeout=5.0)
+            redis_client = await asyncio.wait_for(init_redis(), timeout=5.0)
             logger.info("✅ Redis initialized")
         except asyncio.TimeoutError:
             logger.error("❌ Redis init timed out after 5s")
+            logger.warning("⚠️  Rate limiting will be disabled without Redis")
             # Continue in degraded mode without Redis
             pass
         except Exception as e:
             logger.error(f"❌ Redis init failed: {e}")
+            logger.warning("⚠️  Rate limiting will be disabled without Redis")
             # Continue in degraded mode without Redis
+            pass
+
+        # Add rate limiting middleware (after Redis init)
+        try:
+            rate_limit_middleware = create_rate_limit_middleware(redis_client)
+            app.middleware("http")(rate_limit_middleware)
+            logger.info("✅ Rate limiting enabled")
+        except Exception as e:
+            logger.error(f"❌ Rate limiting setup failed: {e}")
+            # Continue without rate limiting
             pass
 
         # Seed travel agents (non-blocking)
