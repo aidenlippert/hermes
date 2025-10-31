@@ -128,11 +128,13 @@ class User(Base):
 
 
 class APIKey(Base):
-    """API keys for programmatic access"""
+    """API keys for programmatic access (users and agents)"""
     __tablename__ = "api_keys"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
+    agent_id = Column(String, ForeignKey("agents.id", ondelete="CASCADE"), nullable=True)
+    key_hash = Column(String, unique=True, nullable=False, index=True)
     key = Column(String, unique=True, nullable=False, index=True)
     name = Column(String, nullable=True)
 
@@ -190,11 +192,16 @@ class Agent(Base):
     is_featured = Column(Boolean, default=False)
     is_verified = Column(Boolean, default=False)
 
+    # Autonomy and Permissions
+    is_public = Column(Boolean, default=False)
+    max_calls_per_hour = Column(Integer, default=100)
+    trust_score = Column(Float, default=0.5)
+
     # Agent card (raw JSON from A2A discovery)
     agent_card = Column(JSON, nullable=True)
 
     # Organization ownership (optional)
-    org_id = Column(String, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
+    organization_id = Column(String, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
 
     # Creator
     creator_id = Column(String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
