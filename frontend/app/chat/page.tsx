@@ -123,8 +123,9 @@ function ChatPage() {
   return (
     <div className="flex h-screen bg-background-dark text-gray-100">
       <main className="flex-1 flex flex-col">
-        <div className="flex-shrink-0 border-b border-gray-800 px-6 py-4">
+        <div className="flex-shrink-0 border-b border-gray-800 px-6 py-4 flex items-center justify-between">
           <h3 className="text-lg font-bold">Astraeus Orchestrator - Active</h3>
+          <a href="/orchestration/history" className="text-sm text-gray-400 hover:text-white">View History →</a>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4">
