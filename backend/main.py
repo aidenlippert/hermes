@@ -100,13 +100,16 @@ app = FastAPI(
 )
 
 # CORS - Support both local dev and production
-FRONTEND_URL = os.getenv("FRONTEND_URL", "https://hermes-aidenlippert.vercel.app")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "https://hermes-one-navy.vercel.app")
 origins = [
     "http://localhost:3000",  # Local Next.js dev server
     "http://localhost:3001",  # Alternative port
     "http://127.0.0.1:3000",  # Alternative local
     "http://127.0.0.1:3001",  # Alternative local
     FRONTEND_URL,  # Production Vercel URL
+    "https://hermes-one-navy.vercel.app",  # Primary Vercel domain
+    "https://hermes-git-main-aiden-lipperts-projects.vercel.app",  # Git branch domain
+    "https://hermes-icifpcupy-aiden-lipperts-projects.vercel.app",  # Deployment preview domain
 ]
 
 # Remove duplicates and empty strings
@@ -118,6 +121,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Get API key from environment
