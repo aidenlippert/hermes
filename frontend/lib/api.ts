@@ -143,6 +143,162 @@ export const api = {
       return response.data;
     },
   },
+
+  // Payments & Credits (Sprint 3)
+  payments: {
+    async purchaseCredits(amount: number, provider: string, token: string) {
+      const response = await axios.post(
+        `${API_URL}/api/v1/payments/credits/purchase`,
+        { amount, provider },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      return response.data;
+    },
+
+    async getBalance(token: string) {
+      const response = await axios.get(
+        `${API_URL}/api/v1/payments/credits/balance`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      return response.data;
+    },
+
+    async getTransactions(token: string) {
+      const response = await axios.get(
+        `${API_URL}/api/v1/payments/credits/transactions`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      return response.data;
+    },
+  },
+
+  // Contracts (Sprint 3)
+  contracts: {
+    async create(title: string, description: string, budget: number, token: string) {
+      const response = await axios.post(
+        `${API_URL}/api/v1/contracts`,
+        { title, description, budget },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      return response.data;
+    },
+
+    async list(token: string, status?: string) {
+      const params = status ? { status } : {};
+      const response = await axios.get(
+        `${API_URL}/api/v1/contracts`,
+        { headers: { Authorization: `Bearer ${token}` }, params }
+      );
+      return response.data;
+    },
+
+    async get(id: string, token: string) {
+      const response = await axios.get(
+        `${API_URL}/api/v1/contracts/${id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      return response.data;
+    },
+  },
+
+  // Orchestration (Sprint 2)
+  orchestration: {
+    async createPlan(query: string, token: string) {
+      const response = await axios.post(
+        `${API_URL}/api/v1/orchestration/plan`,
+        { query },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      return response.data;
+    },
+
+    async executePlan(planId: string, token: string) {
+      const response = await axios.post(
+        `${API_URL}/api/v1/orchestration/plan/${planId}/execute`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      return response.data;
+    },
+
+    async getPlan(planId: string, token: string) {
+      const response = await axios.get(
+        `${API_URL}/api/v1/orchestration/plan/${planId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      return response.data;
+    },
+  },
+
+  // Security & Reputation (Sprint 4)
+  security: {
+    async getReputation(agentId: string, token: string) {
+      const response = await axios.get(
+        `${API_URL}/api/v1/security/reputation/${agentId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      return response.data;
+    },
+
+    async getFraudAlerts(token: string) {
+      const response = await axios.get(
+        `${API_URL}/api/v1/security/fraud-alerts`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      return response.data;
+    },
+
+    async getTrustOverview(agentId: string, token: string) {
+      const response = await axios.get(
+        `${API_URL}/api/v1/security/trust-overview/${agentId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      return response.data;
+    },
+  },
+
+  // Analytics (Sprint 5)
+  analytics: {
+    async getDashboard(days: number, token: string) {
+      const response = await axios.get(
+        `${API_URL}/api/v1/analytics/dashboard`,
+        { headers: { Authorization: `Bearer ${token}` }, params: { days } }
+      );
+      return response.data;
+    },
+
+    async getUserAnalytics(userId: string, token: string) {
+      const response = await axios.get(
+        `${API_URL}/api/v1/analytics/user/${userId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      return response.data;
+    },
+
+    async getAgentAnalytics(agentId: string, token: string) {
+      const response = await axios.get(
+        `${API_URL}/api/v1/analytics/agent/${agentId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      return response.data;
+    },
+
+    async getPerformance(token: string) {
+      const response = await axios.get(
+        `${API_URL}/api/v1/analytics/performance`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      return response.data;
+    },
+
+    async getHealth(token: string) {
+      const response = await axios.get(
+        `${API_URL}/api/v1/analytics/monitoring/health`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      return response.data;
+    },
+  },
 };
 
 // WebSocket Connection
