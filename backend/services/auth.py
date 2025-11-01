@@ -41,17 +41,12 @@ class AuthService:
         if not password:
             raise ValueError("Password cannot be empty")
 
-        # Check byte length (bcrypt limit is 72 bytes)
-        password_bytes = password.encode('utf-8')
-        if len(password_bytes) > 72:
-            raise ValueError(
-                f"Password is too long ({len(password_bytes)} bytes). "
-                "Maximum is 72 bytes. Please use a shorter password."
-            )
-
         # Minimum length
         if len(password) < 8:
             raise ValueError("Password must be at least 8 characters long")
+
+        # Note: We don't validate max byte length here because we auto-truncate
+        # in hash_password() to handle bcrypt's 72-byte limit
 
     @staticmethod
     def hash_password(password: str) -> str:
@@ -68,6 +63,13 @@ class AuthService:
         """
         # Validate before hashing
         AuthService.validate_password(password)
+
+        # Bcrypt has 72-byte limit, truncate if needed
+        # This is safe because we validate length above
+        password_bytes = password.encode('utf-8')
+        if len(password_bytes) > 72:
+            password = password_bytes[:72].decode('utf-8', errors='ignore')
+
         return pwd_context.hash(password)
 
     @staticmethod
@@ -82,6 +84,11 @@ class AuthService:
             True if password matches, False otherwise
         """
         try:
+            # Truncate to 72 bytes if needed (same as hash_password)
+            password_bytes = plain_password.encode('utf-8')
+            if len(password_bytes) > 72:
+                plain_password = password_bytes[:72].decode('utf-8', errors='ignore')
+
             return pwd_context.verify(plain_password, hashed_password)
         except Exception:
             # If verification fails for any reason, return False
