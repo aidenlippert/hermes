@@ -310,16 +310,33 @@ async def execute_groq_chat_task(task_id: str, query: str):
 
         logger.info(f"⚡ [{task_id[:8]}] Calling Groq API with query: {query[:100]}...")
 
-        # Orchestrate with Groq
+        # Use Groq to generate direct response
         try:
-            result = await groq_orchestrator.orchestrate(query, astraeus_client)
-            logger.info(f"✅ [{task_id[:8]}] Groq returned result: {str(result)[:200]}")
+            from groq import Groq
+            client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+
+            response = client.chat.completions.create(
+                model="llama-3-70b-8192",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a helpful AI assistant. Provide clear, concise, and accurate responses."
+                    },
+                    {
+                        "role": "user",
+                        "content": query
+                    }
+                ],
+                temperature=0.7,
+                max_tokens=1024
+            )
+
+            result_text = response.choices[0].message.content
+            logger.info(f"✅ [{task_id[:8]}] Groq returned result: {result_text[:200]}")
         except Exception as orchestrate_error:
             logger.error(f"❌ [{task_id[:8]}] Orchestration failed: {orchestrate_error}")
             raise
 
-        # Format result
-        result_text = result.get("result", str(result))
         logger.info(f"📝 [{task_id[:8]}] Formatted result: {result_text[:200]}")
 
         # Update task
