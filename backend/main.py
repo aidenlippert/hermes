@@ -268,84 +268,63 @@ async def available_agents_list():
 
 async def execute_groq_chat_task(task_id: str, query: str):
     """
-    Execute chat orchestration using GROQ API (FREE & FAST!)
-    Uses llama-3-70b-8192 for instant AI responses.
+    Execute orchestration with Groq AI + A2A Protocol
+
+    Flow:
+    1. Detect intent (agent_discovery / task_execution / question)
+    2. Handle agent_discovery → Show agents from database + mesh
+    3. Handle task_execution → A2A protocol (future)
+    4. Handle question → Groq answer
     """
     try:
-        logger.info(f"🤖 [{task_id[:8]}] ====== STARTING GROQ ORCHESTRATION ======")
+        logger.info(f"🤖 [{task_id[:8]}] ====== STARTING A2A ORCHESTRATION ======")
         logger.info(f"🤖 [{task_id[:8]}] Query: {query}")
-        logger.info(f"🤖 [{task_id[:8]}] Python path: {os.getcwd()}")
-        logger.info(f"🤖 [{task_id[:8]}] Environment variables: GROQ_API_KEY={'SET' if os.getenv('GROQ_API_KEY') else 'NOT SET'}")
 
         tasks[task_id]["status"] = "in_progress"
 
         # Send status update
-        logger.info(f"📤 [{task_id[:8]}] Sending task_started event...")
         await manager.send_to_task(task_id, {
             "type": "task_started",
             "task_id": task_id,
-            "message": "🤖 AI is processing your request..."
+            "message": "🤖 Analyzing your request..."
         })
-        logger.info(f"✅ [{task_id[:8]}] task_started event sent")
 
-        # Use Groq orchestrator
-        logger.info(f"📦 [{task_id[:8]}] Importing FreeGroqOrchestrator...")
-        logger.info(f"📦 [{task_id[:8]}] Current directory: {os.getcwd()}")
-        logger.info(f"📦 [{task_id[:8]}] Files in current dir: {os.listdir('.')}")
-        logger.info(f"📦 [{task_id[:8]}] Files in backend/: {os.listdir('backend') if os.path.exists('backend') else 'backend dir not found'}")
-        try:
-            from backend.orchestrator_groq import FreeGroqOrchestrator
-            logger.info(f"✅ [{task_id[:8]}] Import successful!")
-        except Exception as import_error:
-            logger.error(f"❌ [{task_id[:8]}] Import failed: {import_error}")
-            raise
+        # Initialize A2A orchestrator
+        from backend.orchestrator_a2a import A2AOrchestrator
+        orchestrator = A2AOrchestrator()
 
-        logger.info(f"🏗️ [{task_id[:8]}] Initializing Groq orchestrator...")
-        try:
-            groq_orchestrator = FreeGroqOrchestrator()
-            logger.info(f"✅ [{task_id[:8]}] Orchestrator initialized!")
-        except Exception as init_error:
-            logger.error(f"❌ [{task_id[:8]}] Initialization failed: {init_error}")
-            raise
+        # Detect intent
+        intent_data = await orchestrator.detect_intent(query)
+        logger.info(f"🎯 [{task_id[:8]}] Intent: {intent_data['intent']}")
 
-        logger.info(f"⚡ [{task_id[:8]}] Calling Groq API with query: {query[:100]}...")
+        if intent_data["intent"] == "agent_discovery":
+            # Handle agent discovery
+            result = await orchestrator.handle_agent_discovery(query, agent_registry, mesh)
+            result_text = result["result"]
 
-        # Use Groq to generate direct response
-        try:
-            from groq import Groq
-            client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+            # Send agents_discovered event
+            if result.get("agents"):
+                await manager.send_to_task(task_id, {
+                    "type": "agents_discovered",
+                    "agents": result["agents"],
+                    "message": f"Found {len(result['agents'])} agents"
+                })
 
-            response = client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are a helpful AI assistant. Provide clear, concise, and accurate responses."
-                    },
-                    {
-                        "role": "user",
-                        "content": query
-                    }
-                ],
-                temperature=0.7,
-                max_tokens=1024
-            )
+        elif intent_data["intent"] == "task_execution":
+            # Future: A2A protocol execution
+            result_text = "🚧 Task execution via A2A protocol coming soon! For now, ask about available agents."
 
-            result_text = response.choices[0].message.content
-            logger.info(f"✅ [{task_id[:8]}] Groq returned result: {result_text[:200]}")
-        except Exception as orchestrate_error:
-            logger.error(f"❌ [{task_id[:8]}] Orchestration failed: {orchestrate_error}")
-            raise
+        else:
+            # General question
+            result_text = await orchestrator.answer_question(query)
 
-        logger.info(f"📝 [{task_id[:8]}] Formatted result: {result_text[:200]}")
+        logger.info(f"✅ [{task_id[:8]}] Result: {result_text[:200]}")
 
         # Update task
         tasks[task_id]["status"] = "completed"
         tasks[task_id]["result"] = {"result": result_text}
-        logger.info(f"💾 [{task_id[:8]}] Task status updated to completed")
 
         # Send completion
-        logger.info(f"📤 [{task_id[:8]}] Sending task_complete event...")
         await manager.send_to_task(task_id, {
             "type": "task_complete",
             "success": True,
@@ -353,26 +332,22 @@ async def execute_groq_chat_task(task_id: str, query: str):
             "message": "✅ Task completed!"
         })
 
-        logger.info(f"✅ [{task_id[:8]}] ====== GROQ ORCHESTRATION COMPLETE ======")
+        logger.info(f"✅ [{task_id[:8]}] ====== ORCHESTRATION COMPLETE ======")
 
     except Exception as e:
-        logger.error(f"❌ [{task_id[:8]}] ====== GROQ TASK FAILED ======")
-        logger.error(f"❌ [{task_id[:8]}] Error type: {type(e).__name__}")
-        logger.error(f"❌ [{task_id[:8]}] Error message: {str(e)}")
+        logger.error(f"❌ [{task_id[:8]}] ====== TASK FAILED ======")
+        logger.error(f"❌ [{task_id[:8]}] Error: {str(e)}")
         import traceback
-        logger.error(f"❌ [{task_id[:8]}] Full traceback:")
         traceback.print_exc()
 
         tasks[task_id]["status"] = "failed"
         tasks[task_id]["error"] = str(e)
 
-        logger.info(f"📤 [{task_id[:8]}] Sending error event...")
         await manager.send_to_task(task_id, {
             "type": "error",
             "error": str(e),
             "message": f"❌ Task failed: {str(e)}"
         })
-        logger.info(f"✅ [{task_id[:8]}] Error event sent")
 
 
 async def execute_mesh_chat_task(task_id: str, query: str):
