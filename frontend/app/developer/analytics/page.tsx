@@ -1,188 +1,407 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import Link from "next/link"
-import { 
-  LayoutDashboard, 
-  Bot, 
-  BarChart, 
-  History, 
-  Settings, 
-  FileText, 
-  HelpCircle 
+import {
+  LayoutDashboard,
+  Bot,
+  CreditCard,
+  Key,
+  FileText,
+  TrendingUp,
+  Clock,
+  AlertCircle,
+  Download
 } from "lucide-react"
 
-const StatCard = ({ title, value, change, isError = false }: { title: string, value: string, change: string, isError?: boolean }) => (
-  <div className={`flex flex-col gap-2 rounded-lg p-6 border ${isError ? 'border-primary/50' : 'border-[#533c3d]'} bg-[#181111]`}>
-    <p className="text-white text-base font-medium leading-normal">{title}</p>
-    <p className={`tracking-light text-3xl font-bold leading-tight ${isError ? 'text-primary' : 'text-white'}`}>{value}</p>
-    <p className={`text-base font-medium leading-normal ${isError ? 'text-primary' : change.startsWith('+') ? 'text-[#0bda95]' : 'text-[#fa7f38]'}`}>{change}</p>
-  </div>
-)
+interface AnalyticsData {
+  revenue: {
+    total: number
+    change: string
+  }
+  activeAgents: {
+    total: number
+    change: string
+  }
+  avgLatency: {
+    value: number
+    change: string
+  }
+  errorRate: {
+    value: number
+    change: string
+  }
+  invocationsChart: {
+    total: string
+    data: Array<{ timestamp: string; calls: number }>
+  }
+  topAgents: Array<{
+    name: string
+    calls: number
+    percentage: number
+  }>
+}
 
-const Chart = () => (
-  <div className="flex min-h-[250px] flex-1 flex-col gap-8 py-4">
-    <svg fill="none" height="100%" preserveAspectRatio="none" viewBox="-3 0 478 150" width="100%" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient gradientUnits="userSpaceOnUse" id="paint0_linear_1131_5935" x1="236" x2="236" y1="1" y2="149">
-          <stop stopColor="#382929"></stop>
-          <stop offset="1" stopColor="#382929" stopOpacity="0"></stop>
-        </linearGradient>
-      </defs>
-      <path d="M0 109C18.1538 109 18.1538 21 36.3077 21C54.4615 21 54.4615 41 72.6154 41C90.7692 41 90.7692 93 108.923 93C127.077 93 127.077 33 145.231 33C163.385 33 163.385 101 181.538 101C199.692 101 199.692 61 217.846 61C236 61 236 45 254.154 45C272.308 45 272.308 121 290.462 121C308.615 121 308.615 149 326.769 149C344.923 149 344.923 1 363.077 1C381.231 1 381.231 81 399.385 81C417.538 81 417.538 129 435.692 129C453.846 129 453.846 25 472 25V149H0V109Z" fill="url(#paint0_linear_1131_5935)"></path>
-      <path d="M0 109C18.1538 109 18.1538 21 36.3077 21C54.4615 21 54.4615 41 72.6154 41C90.7692 41 90.7692 93 108.923 93C127.077 93 127.077 33 145.231 33C163.385 33 163.385 101 181.538 101C199.692 101 199.692 61 217.846 61C236 61 236 45 254.154 45C272.308 45 272.308 121 290.462 121C308.615 121 308.615 149 326.769 149C344.923 149 344.923 1 363.077 1C381.231 1 381.231 81 399.385 81C417.538 81 417.538 129 435.692 129C453.846 129 453.846 25 472 25" stroke="#b89d9f" strokeLinecap="round" strokeWidth="3"></path>
-      <path d="M0 140C18.1538 140 18.1538 130 36.3077 130C54.4615 130 54.4615 135 72.6154 135C90.7692 135 90.7692 142 108.923 142C127.077 142 127.077 138 145.231 138C163.385 138 163.385 145 181.538 145C199.692 145 199.692 141 217.846 141C236 141 236 143 254.154 143C272.308 143 272.308 148 290.462 148C308.615 148 308.615 146 326.769 146C344.923 146 344.923 125 363.077 125C381.231 125 381.231 140 399.385 140C417.538 140 417.538 138 435.692 138C453.846 138 453.846 132 472 132" stroke="#ea2a33" strokeLinecap="round" strokeWidth="2"></path>
-    </svg>
-    <div className="flex justify-around -mt-4">
-      <p className="text-[#b89d9f] text-[13px] font-bold leading-normal tracking-[0.015em]">12 AM</p>
-      <p className="text-[#b89d9f] text-[13px] font-bold leading-normal tracking-[0.015em]">4 AM</p>
-      <p className="text-[#b89d9f] text-[13px] font-bold leading-normal tracking-[0.015em]">8 AM</p>
-      <p className="text-[#b89d9f] text-[13px] font-bold leading-normal tracking-[0.015em]">12 PM</p>
-      <p className="text-[#b89d9f] text-[13px] font-bold leading-normal tracking-[0.015em]">4 PM</p>
-      <p className="text-[#b89d9f] text-[13px] font-bold leading-normal tracking-[0.015em]">8 PM</p>
-      <p className="text-[#b89d9f] text-[13px] font-bold leading-normal tracking-[0.015em]">Now</p>
+type TimeRange = "24h" | "7d" | "30d" | "90d" | "custom"
+
+const StatCard = ({
+  title,
+  value,
+  change,
+  icon: Icon,
+  isError = false
+}: {
+  title: string
+  value: string
+  change: string
+  icon: any
+  isError?: boolean
+}) => (
+  <div className={`flex flex-col gap-3 rounded-xl p-6 border ${isError ? 'border-red-500/30' : 'border-white/10'} bg-white/5`}>
+    <div className="flex items-center justify-between">
+      <p className="text-white/70 text-sm font-medium">{title}</p>
+      <Icon className={`w-5 h-5 ${isError ? 'text-red-400' : 'text-purple-400'}`} />
     </div>
+    <p className={`text-3xl font-bold ${isError ? 'text-red-400' : 'text-white'}`}>{value}</p>
+    <p className={`text-sm font-medium ${
+      isError ? 'text-red-400' :
+      change.startsWith('+') ? 'text-green-400' : 'text-orange-400'
+    }`}>
+      {change} from previous period
+    </p>
   </div>
 )
 
-const queries = [
-  { timestamp: "2024-07-21 14:35:12.189", id: "q_ab12cd34ef56", status: "Success", latency: "112ms" },
-  { timestamp: "2024-07-21 14:35:10.543", id: "q_bc23de45fg67", status: "Success", latency: "98ms" },
-  { timestamp: "2024-07-21 14:35:08.912", id: "q_cd34ef56gh78", status: "System Error", latency: "1540ms" },
-  { timestamp: "2024-07-21 14:35:07.331", id: "q_de45fg67hi89", status: "Validation Error", latency: "45ms" },
-  { timestamp: "2024-07-21 14:35:05.102", id: "q_ef56gh78ij90", status: "Success", latency: "130ms" },
-]
+const TimeRangeChip = ({
+  label,
+  value,
+  active,
+  onClick
+}: {
+  label: string
+  value: TimeRange
+  active: boolean
+  onClick: (value: TimeRange) => void
+}) => (
+  <button
+    onClick={() => onClick(value)}
+    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+      active
+        ? 'bg-purple-600 text-white'
+        : 'bg-white/5 text-white/70 hover:bg-white/10'
+    }`}
+  >
+    {label}
+  </button>
+)
 
-export default function AnalyticsPage() {
+export default function DeveloperAnalytics() {
+  const [timeRange, setTimeRange] = useState<TimeRange>("30d")
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetchAnalytics()
+  }, [timeRange])
+
+  const fetchAnalytics = async () => {
+    setLoading(true)
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'https://web-production-3df46.up.railway.app'}/api/v1/developers/me/analytics?range=${timeRange}`,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        }
+      )
+
+      if (response.ok) {
+        const data = await response.json()
+        setAnalyticsData(data)
+      } else {
+        setAnalyticsData(getMockData())
+      }
+    } catch (error) {
+      console.error("Failed to fetch analytics:", error)
+      setAnalyticsData(getMockData())
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const getMockData = (): AnalyticsData => ({
+    revenue: {
+      total: 14780.50,
+      change: "+12.5%"
+    },
+    activeAgents: {
+      total: 128,
+      change: "+8.3%"
+    },
+    avgLatency: {
+      value: 112,
+      change: "-3.2%"
+    },
+    errorRate: {
+      value: 1.2,
+      change: "+0.3%"
+    },
+    invocationsChart: {
+      total: "1.2M",
+      data: generateMockChartData()
+    },
+    topAgents: [
+      { name: "QueryProcessor-v3", calls: 320000, percentage: 36 },
+      { name: "ImageAnalyzer-Pro", calls: 280000, percentage: 31 },
+      { name: "TranslationBot", calls: 150000, percentage: 17 },
+      { name: "CodeReviewer-AI", calls: 90000, percentage: 10 },
+      { name: "DataMiner-v2", calls: 50000, percentage: 6 }
+    ]
+  })
+
+  const generateMockChartData = () => {
+    const data = []
+    const now = Date.now()
+    const days = timeRange === "24h" ? 1 : timeRange === "7d" ? 7 : timeRange === "30d" ? 30 : 90
+
+    for (let i = days; i >= 0; i--) {
+      data.push({
+        timestamp: new Date(now - i * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        calls: Math.floor(Math.random() * 50000) + 30000
+      })
+    }
+    return data
+  }
+
+  const handleExport = () => {
+    const csvData = [
+      ['Metric', 'Value', 'Change'],
+      ['Total Revenue', `$${analyticsData?.revenue.total}`, analyticsData?.revenue.change || ''],
+      ['Active Agents', analyticsData?.activeAgents.total.toString() || '', analyticsData?.activeAgents.change || ''],
+      ['Avg Latency', `${analyticsData?.avgLatency.value}ms`, analyticsData?.avgLatency.change || ''],
+      ['Error Rate', `${analyticsData?.errorRate.value}%`, analyticsData?.errorRate.change || ''],
+    ]
+
+    const csv = csvData.map(row => row.join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `analytics-${timeRange}-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+  }
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen bg-[#0a0a0a] items-center justify-center">
+        <div className="text-white text-xl">Loading analytics...</div>
+      </div>
+    )
+  }
+
+  const maxCalls = Math.max(...(analyticsData?.topAgents.map(a => a.calls) || [1]))
+
   return (
-    <div className="flex min-h-screen bg-background-dark font-display text-[#E0E0E0]">
-      <aside className="flex w-64 flex-col bg-[#181111] p-4 border-r border-[#382929]">
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center gap-3">
-            <div className="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10" style={{backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuBV4qqVD5MG4j40aIvWlr9rBeDSDzVU3hzzkSBJ6qrz7rNfZ6tWt5NVIMziKmZWTk6aQcfOrBdjGR1vy0NGLSVbaS2YYZSdJpKw0UiXenESFU2BAKJX3captbSxqjjwdf-z9zeZeRFi2mj93uSGzb5NgodGtJeyXcweABcwl3x8qInxIoDW-5hq9rGXq29FxnRkCse9Lt06QCAD0slu-3seI-saZlxdkXW9SmQeObnad5YPmoYzAUfv74K-Ttbab_1axuC8f29kFxSy")'}}></div>
-            <div className="flex flex-col">
-              <h1 className="text-white text-base font-medium leading-normal">Hermes</h1>
-              <p className="text-[#b89d9f] text-sm font-normal leading-normal">Agent Orchestration</p>
-            </div>
+    <div className="flex min-h-screen bg-[#0a0a0a]">
+      <aside className="w-64 bg-[#111111] border-r border-white/10 p-4 flex flex-col">
+        <div className="flex items-center gap-3 mb-8">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+            <Bot className="w-6 h-6 text-white" />
           </div>
-          <div className="flex flex-col gap-2 mt-4">
-            <Link href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[#382929] transition-colors">
-              <LayoutDashboard className="text-white" />
-              <p className="text-white text-sm font-medium leading-normal">Dashboard</p>
-            </Link>
-            <Link href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[#382929] transition-colors">
-              <Bot className="text-white" />
-              <p className="text-white text-sm font-medium leading-normal">Agents</p>
-            </Link>
-            <Link href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[#382929]">
-              <BarChart className="text-white" />
-              <p className="text-white text-sm font-medium leading-normal">Analytics</p>
-            </Link>
-            <Link href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[#382929] transition-colors">
-              <History className="text-white" />
-              <p className="text-white text-sm font-medium leading-normal">Logs</p>
-            </Link>
-            <Link href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[#382929] transition-colors">
-              <Settings className="text-white" />
-              <p className="text-white text-sm font-medium leading-normal">Settings</p>
-            </Link>
+          <div>
+            <h1 className="text-white font-bold">ASTRAEUS</h1>
+            <p className="text-white/50 text-xs">Developer Portal</p>
           </div>
         </div>
-        <div className="mt-auto flex flex-col gap-1">
-          <Link href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[#382929] transition-colors">
-            <FileText className="text-white" />
-            <p className="text-white text-sm font-medium leading-normal">Documentation</p>
+
+        <nav className="flex flex-col gap-1 flex-1">
+          <Link
+            href="/developer"
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-white/70 hover:bg-white/5 hover:text-white transition-colors"
+          >
+            <LayoutDashboard className="w-5 h-5" />
+            <span className="text-sm font-medium">Dashboard</span>
           </Link>
-          <Link href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[#382929] transition-colors">
-            <HelpCircle className="text-white" />
-            <p className="text-white text-sm font-medium leading-normal">Support</p>
+          <Link
+            href="/my-agents"
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-white/70 hover:bg-white/5 hover:text-white transition-colors"
+          >
+            <Bot className="w-5 h-5" />
+            <span className="text-sm font-medium">My Agents</span>
           </Link>
+          <Link
+            href="/settings/billing"
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-white/70 hover:bg-white/5 hover:text-white transition-colors"
+          >
+            <CreditCard className="w-5 h-5" />
+            <span className="text-sm font-medium">Billing</span>
+          </Link>
+          <Link
+            href="/developer/api-docs"
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-white/70 hover:bg-white/5 hover:text-white transition-colors"
+          >
+            <Key className="w-5 h-5" />
+            <span className="text-sm font-medium">API Keys</span>
+          </Link>
+          <Link
+            href="/developer/guide"
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-white/70 hover:bg-white/5 hover:text-white transition-colors"
+          >
+            <FileText className="w-5 h-5" />
+            <span className="text-sm font-medium">Documentation</span>
+          </Link>
+        </nav>
+
+        <div className="mt-auto pt-4 border-t border-white/10">
+          <div className="px-3 py-2 bg-purple-600/10 border border-purple-500/30 rounded-lg">
+            <p className="text-purple-400 text-xs font-medium">Pro Plan</p>
+            <p className="text-white/70 text-xs mt-1">$49/month</p>
+          </div>
         </div>
       </aside>
 
       <main className="flex-1 p-8">
-        <div className="flex flex-col gap-6">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex flex-col gap-2">
-              <p className="text-white text-4xl font-black leading-tight tracking-[-0.033em]">Agent Performance: QueryProcessor-v3</p>
-              <div className="flex items-center gap-2">
-                <span className="relative flex h-3 w-3">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-                </span>
-                <p className="text-[#0BDA95] text-base font-normal leading-normal">Status: Online</p>
-              </div>
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h1 className="text-4xl font-black text-white mb-2">Developer Analytics</h1>
+              <p className="text-white/70">Monitor your agent performance and revenue</p>
             </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <button className="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-[#382929] text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-[#4a3a3a] transition-colors">
-                <span className="truncate">Refresh Data</span>
-              </button>
-              <button className="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-primary text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-red-700 transition-colors">
-                <span className="truncate">Export Report</span>
-              </button>
-              <button className="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-transparent border border-[#533c3d] text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-[#382929] transition-colors">
-                <span className="truncate">Configure Agent</span>
-              </button>
-            </div>
+            <button
+              onClick={handleExport}
+              className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-white font-medium transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              Export Report
+            </button>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard title="Total Queries" value="1,230,456" change="+5.2%" />
-            <StatCard title="Success Rate" value="99.8%" change="-0.1%" />
-            <StatCard title="Avg. Latency" value="128ms" change="+2.4%" />
-            <StatCard title="Error Count" value="42" change="+12.0%" isError />
+          <div className="flex gap-2 mb-8">
+            <TimeRangeChip label="24 Hours" value="24h" active={timeRange === "24h"} onClick={setTimeRange} />
+            <TimeRangeChip label="7 Days" value="7d" active={timeRange === "7d"} onClick={setTimeRange} />
+            <TimeRangeChip label="30 Days" value="30d" active={timeRange === "30d"} onClick={setTimeRange} />
+            <TimeRangeChip label="90 Days" value="90d" active={timeRange === "90d"} onClick={setTimeRange} />
+            <TimeRangeChip label="Custom" value="custom" active={timeRange === "custom"} onClick={setTimeRange} />
           </div>
 
-          <div className="flex flex-col gap-2 rounded-lg border border-[#533c3d] p-6 bg-[#181111]">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-white text-lg font-medium leading-normal">Core Metrics Over Time</p>
-                <p className="text-[#b89d9f] text-base font-normal leading-normal">Last 24 Hours</p>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-[#b89d9f]"></div>
-                  <span className="text-sm text-[#b89d9f]">Queries</span>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <StatCard
+              title="Total Revenue"
+              value={`$${analyticsData?.revenue.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              change={analyticsData?.revenue.change || "+0%"}
+              icon={TrendingUp}
+            />
+            <StatCard
+              title="Active Agents"
+              value={analyticsData?.activeAgents.total.toString() || "0"}
+              change={analyticsData?.activeAgents.change || "+0%"}
+              icon={Bot}
+            />
+            <StatCard
+              title="Avg Latency"
+              value={`${analyticsData?.avgLatency.value}ms`}
+              change={analyticsData?.avgLatency.change || "+0%"}
+              icon={Clock}
+            />
+            <StatCard
+              title="Error Rate"
+              value={`${analyticsData?.errorRate.value}%`}
+              change={analyticsData?.errorRate.change || "+0%"}
+              icon={AlertCircle}
+              isError
+            />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <div className="bg-white/5 border border-white/10 rounded-xl p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-xl font-bold text-white">API Invocations</h2>
+                  <p className="text-white/50 text-sm mt-1">
+                    {analyticsData?.invocationsChart.total} total calls
+                  </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-primary"></div>
-                  <span className="text-sm text-[#b89d9f]">Errors</span>
-                </div>
+              </div>
+              <div className="h-64 flex items-end gap-1">
+                {analyticsData?.invocationsChart.data.slice(-30).map((point, i) => {
+                  const height = (point.calls / 60000) * 100
+                  return (
+                    <div
+                      key={i}
+                      className="flex-1 bg-gradient-to-t from-purple-600 to-purple-400 rounded-t hover:opacity-80 transition-opacity cursor-pointer"
+                      style={{ height: `${height}%` }}
+                      title={`${point.timestamp}: ${point.calls.toLocaleString()} calls`}
+                    />
+                  )
+                })}
+              </div>
+              <div className="flex justify-between mt-4 text-white/50 text-xs">
+                <span>{analyticsData?.invocationsChart.data[0]?.timestamp}</span>
+                <span>Today</span>
               </div>
             </div>
-            <Chart />
+
+            <div className="bg-white/5 border border-white/10 rounded-xl p-6">
+              <div className="mb-6">
+                <h2 className="text-xl font-bold text-white">Top 5 Agents</h2>
+                <p className="text-white/50 text-sm mt-1">
+                  {analyticsData?.topAgents.reduce((sum, a) => sum + a.calls, 0).toLocaleString()} total calls
+                </p>
+              </div>
+              <div className="space-y-4">
+                {analyticsData?.topAgents.map((agent, i) => (
+                  <div key={i}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-white text-sm font-medium">{agent.name}</span>
+                      <span className="text-white/70 text-sm">{agent.calls.toLocaleString()} calls</span>
+                    </div>
+                    <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-purple-600 to-pink-600 rounded-full transition-all duration-500"
+                        style={{ width: `${(agent.calls / maxCalls) * 100}%` }}
+                      />
+                    </div>
+                    <p className="text-white/50 text-xs mt-1">{agent.percentage}% of total</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
 
-          <div className="flex flex-col gap-4 rounded-lg border border-[#533c3d] p-6 bg-[#181111]">
-            <h3 className="text-lg font-medium text-white">Recent Agent Queries</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-[#b89d9f]">
-                <thead className="border-b border-[#533c3d] text-xs uppercase text-white">
-                  <tr>
-                    <th className="px-4 py-3" scope="col">Timestamp</th>
-                    <th className="px-4 py-3" scope="col">Query ID</th>
-                    <th className="px-4 py-3" scope="col">Status</th>
-                    <th className="px-4 py-3 text-right" scope="col">Latency</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {queries.map((query, index) => (
-                    <tr key={index} className="border-b border-[#382929] hover:bg-[#2a1f1f]">
-                      <td className="px-4 py-3">{query.timestamp}</td>
-                      <td className="px-4 py-3 font-mono">{query.id}</td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                          query.status === 'Success' ? 'bg-green-500/20 text-green-400' :
-                          query.status === 'System Error' ? 'bg-red-500/20 text-primary' :
-                          'bg-yellow-500/20 text-yellow-400'
-                        }`}>
-                          {query.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right">{query.latency}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          <div className="bg-white/5 border border-white/10 rounded-xl p-6">
+            <h2 className="text-xl font-bold text-white mb-4">Quick Actions</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Link
+                href="/my-agents/create"
+                className="flex items-center gap-3 p-4 bg-white/5 hover:bg-white/10 rounded-lg border border-white/10 transition-colors"
+              >
+                <Bot className="w-6 h-6 text-purple-400" />
+                <div>
+                  <p className="text-white font-medium">Publish New Agent</p>
+                  <p className="text-white/50 text-sm">Add to marketplace</p>
+                </div>
+              </Link>
+              <Link
+                href="/developer/workflow-builder"
+                className="flex items-center gap-3 p-4 bg-white/5 hover:bg-white/10 rounded-lg border border-white/10 transition-colors"
+              >
+                <FileText className="w-6 h-6 text-purple-400" />
+                <div>
+                  <p className="text-white font-medium">Build Workflow</p>
+                  <p className="text-white/50 text-sm">Create orchestration</p>
+                </div>
+              </Link>
+              <Link
+                href="/developer/api-docs"
+                className="flex items-center gap-3 p-4 bg-white/5 hover:bg-white/10 rounded-lg border border-white/10 transition-colors"
+              >
+                <Key className="w-6 h-6 text-purple-400" />
+                <div>
+                  <p className="text-white font-medium">Generate API Key</p>
+                  <p className="text-white/50 text-sm">Access credentials</p>
+                </div>
+              </Link>
             </div>
           </div>
         </div>

@@ -42,6 +42,7 @@ mesh = MeshNetwork()
 
 from contextlib import asynccontextmanager
 from backend.database.connection import init_db, init_redis, close_redis
+from backend.database.agent_db import init_agent_db, close_agent_db
 
 # Initialize FastAPI
 @asynccontextmanager
@@ -56,7 +57,15 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"❌ PostgreSQL failed: {e}")
         # Continue without database if needed
-    
+
+    try:
+        # Initialize agent database pool
+        await init_agent_db()
+        logger.info("✅ Agent database initialized")
+    except Exception as e:
+        logger.error(f"❌ Agent database failed: {e}")
+        # Continue without agent database if needed
+
     try:
         # Initialize Redis
         await init_redis()
@@ -91,6 +100,7 @@ async def lifespan(app: FastAPI):
     await mesh.stop()
     await a2a_client.close()
     await close_redis()
+    await close_agent_db()
 
 app = FastAPI(
     title="Hermes API",
@@ -987,12 +997,13 @@ async def get_user_preferences(user_id: str = Header(None, alias="X-User-ID")):
 
 @app.post("/api/v1/mesh/agents/register")
 async def register_external_agent(agent_data: Dict[str, Any]):
-    """Register external agent to mesh network
-    
+    """Register external agent to ASTRAEUS network (A2A Protocol)
+
     Body:
         {
             "name": "WeatherBot",
             "owner": "alice@example.com",
+            "framework": "custom|langchain|crewai",
             "capabilities": [
                 {
                     "name": "weather_query",
@@ -1004,40 +1015,299 @@ async def register_external_agent(agent_data: Dict[str, Any]):
             ]
         }
     """
-    from backend.mesh.discovery import discovery_service, AgentRegistration, Capability
-    import uuid
-    
-    # Generate agent ID
+    from backend.database.agent_db import get_agent_pool
+    from backend.database.models_agents import Agent, create_agent
+    from datetime import datetime
+    import json
+
+    pool = get_agent_pool()
+
+    if not pool:
+        raise HTTPException(status_code=503, detail="Agent database not available")
+
     agent_id = f"agent-{str(uuid.uuid4())[:8]}"
-    
-    # Parse capabilities
-    capabilities = []
-    for cap_data in agent_data.get("capabilities", []):
-        cap = Capability(
-            name=cap_data["name"],
-            description=cap_data["description"],
-            confidence=cap_data.get("confidence", 0.9),
-            cost=cap_data.get("cost", 0.0),
-            latency=cap_data.get("latency", 3.0)
-        )
-        capabilities.append(cap)
-    
-    # Create registration
-    registration = AgentRegistration(
+
+    capabilities = agent_data.get("capabilities", [])
+
+    agent_card = {
+        "name": agent_data["name"],
+        "description": agent_data.get("description", ""),
+        "version": agent_data.get("version", "1.0.0"),
+        "capabilities": capabilities,
+        "endpoint": agent_data.get("endpoint", f"http://localhost:8000"),
+        "protocol": "A2A",
+        "framework": agent_data.get("framework", "custom")
+    }
+
+    agent = Agent(
         agent_id=agent_id,
         name=agent_data["name"],
-        endpoint=agent_data.get("endpoint", f"local://{agent_id}"),
+        description=agent_data.get("description"),
+        owner_id=agent_data.get("owner", "anonymous"),
+        endpoint=agent_data.get("endpoint", f"http://localhost:8000"),
+        status="active",
+        agent_card=agent_card,
         capabilities=capabilities,
-        owner=agent_data.get("owner", "anonymous")
+        version=agent_data.get("version", "1.0.0"),
+        framework=agent_data.get("framework", "custom"),
+        trust_score=0.0,
+        base_cost_per_call=0.0
     )
-    
-    # Register
-    await discovery_service.register_agent(registration)
-    
+
+    created_agent = await create_agent(pool, agent)
+
+    async with pool.acquire() as conn:
+        for cap in capabilities:
+            await conn.execute(
+                """
+                INSERT INTO agent_capabilities (agent_id, capability_name, confidence, cost_per_call, avg_latency_ms, description)
+                VALUES ($1, $2, $3, $4, $5, $6)
+                ON CONFLICT (agent_id, capability_name) DO UPDATE
+                SET confidence = $3, cost_per_call = $4, avg_latency_ms = $5, description = $6
+                """,
+                agent_id,
+                cap["name"],
+                cap.get("confidence", 0.9),
+                cap.get("cost", 0.0),
+                cap.get("latency", 30),
+                cap.get("description", "")
+            )
+
+    logger.info(f"✅ Agent registered: {agent_data['name']} ({agent_id})")
+
     return {
         "status": "success",
         "agent_id": agent_id,
-        "message": f"Agent {agent_data['name']} registered successfully"
+        "message": f"Agent {agent_data['name']} registered successfully to ASTRAEUS network",
+        "agent_card_url": f"{agent_data.get('endpoint', 'http://localhost:8000')}/.well-known/agent.json"
+    }
+
+
+@app.get("/api/v1/mesh/agents")
+async def list_agents(
+    capability: Optional[str] = None,
+    framework: Optional[str] = None,
+    min_trust_score: float = 0.0,
+    status: str = "active",
+    limit: int = 10,
+    offset: int = 0
+):
+    """List/search agents on ASTRAEUS network
+
+    Query params:
+        capability: Filter by capability name
+        framework: Filter by framework (langchain, crewai, custom)
+        min_trust_score: Minimum trust score (0.0-1.0)
+        status: Agent status (active, inactive, suspended)
+        limit: Max results (default 10)
+        offset: Pagination offset
+    """
+    from backend.database.agent_db import get_agent_pool
+    from backend.database.models_agents import list_agents as db_list_agents, search_agents_by_capability
+
+    pool = get_agent_pool()
+
+    if not pool:
+        raise HTTPException(status_code=503, detail="Agent database not available")
+
+    if capability:
+        agents = await search_agents_by_capability(pool, capability, limit)
+    else:
+        agents = await db_list_agents(pool, status, framework, limit, offset)
+
+    if min_trust_score > 0:
+        agents = [a for a in agents if a.trust_score >= min_trust_score]
+
+    return [a.dict() for a in agents]
+
+
+@app.get("/api/v1/mesh/agents/{agent_id}")
+async def get_agent_details(agent_id: str):
+    """Get detailed information about a specific agent"""
+    from backend.database.agent_db import get_agent_pool
+    from backend.database.models_agents import get_agent
+
+    pool = get_agent_pool()
+
+    if not pool:
+        raise HTTPException(status_code=503, detail="Agent database not available")
+
+    agent = await get_agent(pool, agent_id)
+
+    if not agent:
+        raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
+
+    return agent.dict()
+
+
+# ========================================
+# AGENT REPUTATION & REVIEW SYSTEM
+# ========================================
+
+@app.post("/api/v1/agents/{agent_id}/review")
+async def review_agent(agent_id: str, rating: int, review_text: str, reviewer_user_id: str):
+    """Submit a review for an agent
+
+    Args:
+        agent_id: Agent to review
+        rating: 1-5 stars
+        review_text: Review text
+        reviewer_user_id: User submitting review
+    """
+    from backend.database.agent_db import get_agent_pool
+
+    pool = get_agent_pool()
+
+    if not pool:
+        raise HTTPException(status_code=503, detail="Agent database not available")
+
+    if rating < 1 or rating > 5:
+        raise HTTPException(status_code=400, detail="Rating must be 1-5")
+
+    async with pool.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO agent_reviews (agent_id, reviewer_user_id, rating, review_text, helpful_count)
+            VALUES ($1, $2, $3, $4, 0)
+            ON CONFLICT (agent_id, reviewer_user_id)
+            DO UPDATE SET rating = $3, review_text = $4, updated_at = CURRENT_TIMESTAMP
+            """,
+            agent_id, reviewer_user_id, rating, review_text
+        )
+
+    await update_agent_trust_score(agent_id)
+
+    logger.info(f"✅ Review added for {agent_id}: {rating}⭐ by {reviewer_user_id}")
+
+    return {"status": "success", "message": "Review submitted successfully"}
+
+
+@app.get("/api/v1/agents/{agent_id}/reviews")
+async def get_agent_reviews(agent_id: str, limit: int = 10, offset: int = 0):
+    """Get reviews for an agent"""
+    from backend.database.agent_db import get_agent_pool
+
+    pool = get_agent_pool()
+
+    if not pool:
+        raise HTTPException(status_code=503, detail="Agent database not available")
+
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT * FROM agent_reviews
+            WHERE agent_id = $1
+            ORDER BY created_at DESC
+            LIMIT $2 OFFSET $3
+            """,
+            agent_id, limit, offset
+        )
+
+    reviews = [dict(row) for row in rows]
+
+    return reviews
+
+
+async def update_agent_trust_score(agent_id: str):
+    """Calculate and update agent trust score based on multiple factors
+
+    Trust Score Calculation:
+    - Success Rate (40%): successful_calls / total_calls
+    - User Reviews (30%): avg_rating / 5.0
+    - Popularity (20%): min(total_calls / 1000, 1.0)
+    - Performance (10%): 1.0 - min(avg_latency_ms / 5000, 1.0)
+    """
+    from backend.database.agent_db import get_agent_pool
+
+    pool = get_agent_pool()
+
+    if not pool:
+        return
+
+    async with pool.acquire() as conn:
+        agent_stats = await conn.fetchrow(
+            "SELECT total_calls, successful_calls, avg_latency_ms FROM agents WHERE agent_id = $1",
+            agent_id
+        )
+
+        if not agent_stats or agent_stats['total_calls'] == 0:
+            return
+
+        review_stats = await conn.fetchrow(
+            "SELECT AVG(rating) as avg_rating, COUNT(*) as review_count FROM agent_reviews WHERE agent_id = $1",
+            agent_id
+        )
+
+        success_rate = agent_stats['successful_calls'] / agent_stats['total_calls']
+        avg_rating = float(review_stats['avg_rating'] or 0) / 5.0
+        popularity = min(agent_stats['total_calls'] / 1000.0, 1.0)
+        performance = 1.0 - min((agent_stats['avg_latency_ms'] or 0) / 5000.0, 1.0)
+
+        trust_score = (
+            success_rate * 0.4 +
+            avg_rating * 0.3 +
+            popularity * 0.2 +
+            performance * 0.1
+        )
+
+        await conn.execute(
+            "UPDATE agents SET trust_score = $1 WHERE agent_id = $2",
+            round(trust_score, 2), agent_id
+        )
+
+        logger.info(f"📊 Updated trust score for {agent_id}: {trust_score:.2f}")
+
+
+@app.get("/api/v1/agents/{agent_id}/stats")
+async def get_agent_stats(agent_id: str):
+    """Get detailed agent statistics and reputation"""
+    from backend.database.agent_db import get_agent_pool
+
+    pool = get_agent_pool()
+
+    if not pool:
+        raise HTTPException(status_code=503, detail="Agent database not available")
+
+    async with pool.acquire() as conn:
+        agent = await conn.fetchrow("SELECT * FROM agents WHERE agent_id = $1", agent_id)
+
+        if not agent:
+            raise HTTPException(status_code=404, detail="Agent not found")
+
+        reviews = await conn.fetch(
+            """
+            SELECT AVG(rating) as avg_rating, COUNT(*) as review_count
+            FROM agent_reviews WHERE agent_id = $1
+            """,
+            agent_id
+        )
+
+        recent_calls = await conn.fetch(
+            """
+            SELECT status, COUNT(*) as count
+            FROM agent_api_calls
+            WHERE callee_agent_id = $1 AND created_at > NOW() - INTERVAL '30 days'
+            GROUP BY status
+            """,
+            agent_id
+        )
+
+    review_data = reviews[0] if reviews else {"avg_rating": 0, "review_count": 0}
+
+    return {
+        "agent_id": agent_id,
+        "name": agent['name'],
+        "trust_score": float(agent['trust_score']),
+        "total_calls": agent['total_calls'],
+        "successful_calls": agent['successful_calls'],
+        "failed_calls": agent['failed_calls'],
+        "success_rate": agent['successful_calls'] / agent['total_calls'] if agent['total_calls'] > 0 else 0,
+        "avg_latency_ms": agent['avg_latency_ms'],
+        "total_revenue": float(agent['total_revenue']),
+        "avg_rating": float(review_data['avg_rating'] or 0),
+        "review_count": review_data['review_count'],
+        "recent_activity": [dict(row) for row in recent_calls],
+        "status": agent['status']
     }
 
 
