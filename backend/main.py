@@ -1529,6 +1529,23 @@ async def send_a2a_message(conversation_id: str, data: Dict[str, Any]):
 # Include authentication router
 app.include_router(v1_auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 
+# WORKAROUND: Add /me endpoint directly to avoid caching issues
+from backend.services.auth import get_current_user
+from backend.database.models import User
+
+@app.get("/api/v1/auth/me", tags=["Authentication"])
+async def get_me_endpoint(current_user: User = Depends(get_current_user)):
+    """Get current user profile"""
+    return {
+        "id": str(current_user.id),
+        "email": current_user.email,
+        "username": current_user.username,
+        "full_name": current_user.full_name,
+        "role": current_user.role,
+        "subscription_tier": current_user.subscription_tier,
+        "created_at": current_user.created_at.isoformat() if current_user.created_at else None
+    }
+
 # Include marketplace router (Sprint 1.2)
 app.include_router(marketplace.router, tags=["Marketplace"])
 
