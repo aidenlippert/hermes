@@ -284,7 +284,7 @@ async def execute_groq_chat_task(task_id: str, query: str):
         })
 
         # Use Groq orchestrator
-        from hermes.conductor.orchestrator_groq import FreeGroqOrchestrator
+        from conductor.orchestrator_groq import FreeGroqOrchestrator
         groq_orchestrator = FreeGroqOrchestrator()
 
         logger.info(f"⚡ [{task_id[:8]}] Calling Groq API...")
@@ -521,7 +521,7 @@ async def execute_mesh_chat_task(task_id: str, query: str):
             logger.info(f"⚡ [{task_id[:8]}] No mesh results, falling back to Groq orchestrator...")
 
             try:
-                from hermes.conductor.orchestrator_groq import FreeGroqOrchestrator
+                from conductor.orchestrator_groq import FreeGroqOrchestrator
                 groq_orchestrator = FreeGroqOrchestrator()
 
                 # Send status update
