@@ -1532,6 +1532,7 @@ app.include_router(v1_auth.router, prefix="/api/v1/auth", tags=["Authentication"
 # WORKAROUND: Add /me endpoint directly to avoid caching issues
 from backend.services.auth import get_current_user
 from backend.database.models import User
+from fastapi import Depends
 
 @app.get("/api/v1/auth/me", tags=["Authentication"])
 async def get_me_endpoint(current_user: User = Depends(get_current_user)):
