@@ -71,6 +71,7 @@ function ChatPage() {
       setWsConnection(ws)
       ws.onmessage = (ev) => {
         const data = JSON.parse(ev.data)
+        console.log('[WebSocket] Received:', data)
         if (data.type === "agents_discovered") {
           setDiscoveryPhase(`Found ${data.agents.length} specialized agents!`)
           setCurrentAgents(data.agents)
