@@ -216,18 +216,18 @@ async def health():
 @app.post("/api/v1/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest, background_tasks: BackgroundTasks):
     """
-    MESH-POWERED ORCHESTRATION ENDPOINT
-    
-    Uses autonomous mesh network for multi-agent coordination:
-    1. Parse user intent into multiple tasks
-    2. Create mesh contracts for each task
-    3. Agents autonomously bid and execute
-    4. Stream results via WebSocket
-    
+    GROQ-POWERED AI ORCHESTRATION ENDPOINT
+
+    Uses FREE Groq API (llama-3-70b-8192) for instant AI responses:
+    1. Parse user intent with AI
+    2. Discover and coordinate agents
+    3. Execute tasks and return results
+    4. Stream progress via WebSocket
+
     Returns immediately with task_id, execution happens in background.
     Client connects via WebSocket for real-time updates.
     """
-    logger.info(f"📨 Chat request (MESH): {request.query[:100]}...")
+    logger.info(f"📨 Chat request (GROQ): {request.query[:100]}...")
 
     # Create task ID
     task_id = str(uuid.uuid4())
@@ -237,19 +237,18 @@ async def chat(request: ChatRequest, background_tasks: BackgroundTasks):
         "task_id": task_id,
         "query": request.query,
         "status": "pending",
-        "contracts": [],
         "result": None,
         "error": None
     }
 
-    # Execute mesh orchestration in background
-    background_tasks.add_task(execute_mesh_chat_task, task_id, request.query)
+    # Execute Groq orchestration in background
+    background_tasks.add_task(execute_groq_chat_task, task_id, request.query)
 
     # Return task ID immediately
     return ChatResponse(
         task_id=task_id,
         status="pending",
-        message="Task created. Mesh network activating..."
+        message="Task created. AI orchestrator activating..."
     )
 
 
@@ -265,6 +264,66 @@ async def available_agents_list():
         for name, agent in agent_registry.items()
         if agent["status"] == "active"
     ]
+
+
+async def execute_groq_chat_task(task_id: str, query: str):
+    """
+    Execute chat orchestration using GROQ API (FREE & FAST!)
+    Uses llama-3-70b-8192 for instant AI responses.
+    """
+    try:
+        logger.info(f"🤖 [{task_id[:8]}] Starting Groq orchestration...")
+
+        tasks[task_id]["status"] = "in_progress"
+
+        # Send status update
+        await manager.send_to_task(task_id, {
+            "type": "task_started",
+            "task_id": task_id,
+            "message": "🤖 AI is processing your request..."
+        })
+
+        # Use Groq orchestrator
+        from hermes.conductor.orchestrator_groq import FreeGroqOrchestrator
+        groq_orchestrator = FreeGroqOrchestrator()
+
+        logger.info(f"⚡ [{task_id[:8]}] Calling Groq API...")
+
+        # Orchestrate with Groq
+        result = await groq_orchestrator.orchestrate(query, astraeus_client)
+
+        logger.info(f"✅ [{task_id[:8]}] Groq returned result")
+
+        # Format result
+        result_text = result.get("result", str(result))
+
+        # Update task
+        tasks[task_id]["status"] = "completed"
+        tasks[task_id]["result"] = result
+
+        # Send completion
+        await manager.send_to_task(task_id, {
+            "type": "task_complete",
+            "success": True,
+            "result": result_text,
+            "message": "✅ Task completed!"
+        })
+
+        logger.info(f"✅ [{task_id[:8]}] Groq orchestration complete")
+
+    except Exception as e:
+        logger.error(f"❌ [{task_id[:8]}] Groq task failed: {e}")
+        import traceback
+        traceback.print_exc()
+
+        tasks[task_id]["status"] = "failed"
+        tasks[task_id]["error"] = str(e)
+
+        await manager.send_to_task(task_id, {
+            "type": "error",
+            "error": str(e),
+            "message": f"❌ Task failed: {str(e)}"
+        })
 
 
 async def execute_mesh_chat_task(task_id: str, query: str):
