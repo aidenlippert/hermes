@@ -7,9 +7,10 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database.connection import get_db
-from backend.services.auth import AuthService
+from backend.services.auth import AuthService, get_current_user
 from backend.schemas import UserCreate, Token
 from pydantic import BaseModel
+from backend.database.models import User
 
 router = APIRouter()
 
@@ -83,4 +84,19 @@ async def refresh_access_token(request: RefreshTokenRequest, db: AsyncSession = 
         "access_token": access_token,
         "refresh_token": new_refresh_token,
         "token_type": "bearer"
+    }
+
+@router.get("/me")
+async def get_current_user_profile(current_user: User = Depends(get_current_user)):
+    """
+    Get the current authenticated user's profile.
+    """
+    return {
+        "id": str(current_user.id),
+        "email": current_user.email,
+        "username": current_user.username,
+        "full_name": current_user.full_name,
+        "role": current_user.role,
+        "subscription_tier": current_user.subscription_tier,
+        "created_at": current_user.created_at.isoformat() if current_user.created_at else None
     }
