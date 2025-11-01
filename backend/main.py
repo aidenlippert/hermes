@@ -341,7 +341,7 @@ async def execute_groq_chat_task(task_id: str, query: str):
 
         # Update task
         tasks[task_id]["status"] = "completed"
-        tasks[task_id]["result"] = result
+        tasks[task_id]["result"] = {"result": result_text}
         logger.info(f"💾 [{task_id[:8]}] Task status updated to completed")
 
         # Send completion
