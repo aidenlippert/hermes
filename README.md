@@ -410,3 +410,4 @@ We don't replace A2A - we make it *actually work* for consumers and businesses.
 **Version**: 2.0.0
 **Status**: 🟢 Production-ready core, expanding agent ecosystem
 **Made with**: Python, FastAPI, PostgreSQL, Redis, Gemini AI, A2A Protocol
+# Force Railway redeploy - Fri Oct 31 22:39:06 PDT 2025
