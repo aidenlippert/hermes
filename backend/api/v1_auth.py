@@ -1,5 +1,6 @@
 """
 API routes for authentication.
+Updated: 2025-10-31 - Added /me endpoint
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
