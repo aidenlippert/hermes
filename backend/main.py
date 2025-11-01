@@ -290,12 +290,14 @@ async def execute_groq_chat_task(task_id: str, query: str):
 
         # Use Groq orchestrator
         logger.info(f"📦 [{task_id[:8]}] Importing FreeGroqOrchestrator...")
+        logger.info(f"📦 [{task_id[:8]}] Current directory: {os.getcwd()}")
+        logger.info(f"📦 [{task_id[:8]}] Files in current dir: {os.listdir('.')}")
+        logger.info(f"📦 [{task_id[:8]}] Files in backend/: {os.listdir('backend') if os.path.exists('backend') else 'backend dir not found'}")
         try:
-            from orchestrator_groq import FreeGroqOrchestrator
+            from backend.orchestrator_groq import FreeGroqOrchestrator
             logger.info(f"✅ [{task_id[:8]}] Import successful!")
         except Exception as import_error:
             logger.error(f"❌ [{task_id[:8]}] Import failed: {import_error}")
-            logger.error(f"❌ [{task_id[:8]}] Available files in backend/: {os.listdir('.')}")
             raise
 
         logger.info(f"🏗️ [{task_id[:8]}] Initializing Groq orchestrator...")
@@ -551,7 +553,7 @@ async def execute_mesh_chat_task(task_id: str, query: str):
             logger.info(f"⚡ [{task_id[:8]}] No mesh results, falling back to Groq orchestrator...")
 
             try:
-                from orchestrator_groq import FreeGroqOrchestrator
+                from backend.orchestrator_groq import FreeGroqOrchestrator
                 groq_orchestrator = FreeGroqOrchestrator()
 
                 # Send status update
