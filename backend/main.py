@@ -1526,10 +1526,7 @@ async def send_a2a_message(conversation_id: str, data: Dict[str, Any]):
 # 🔸 LEGACY ENDPOINTS
 # ============================================================
 
-# Include authentication router
-app.include_router(v1_auth.router, prefix="/api/v1/auth", tags=["Authentication"])
-
-# WORKAROUND: Add /me endpoint directly to avoid caching issues
+# CRITICAL FIX: Define /me endpoint BEFORE router to take priority
 from backend.services.auth import get_current_user
 from backend.database.models import User
 from fastapi import Depends
@@ -1546,6 +1543,9 @@ async def get_me_endpoint(current_user: User = Depends(get_current_user)):
         "subscription_tier": current_user.subscription_tier,
         "created_at": current_user.created_at.isoformat() if current_user.created_at else None
     }
+
+# Include authentication router AFTER /me endpoint
+app.include_router(v1_auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 
 # Include marketplace router (Sprint 1.2)
 app.include_router(marketplace.router, tags=["Marketplace"])
