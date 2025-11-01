@@ -395,16 +395,20 @@ async def get_current_user(
 
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = payload.get("sub")
+        email = payload.get("sub")
+        user_id = payload.get("user_id")
 
-        if not user_id:
+        if not email:
             raise HTTPException(
                 status_code=401,
                 detail="Invalid authentication credentials"
             )
 
-        # Get user from database
-        user = await AuthService.get_user_by_id(db, user_id)
+        # Get user from database - try user_id first (faster), fallback to email
+        if user_id:
+            user = await AuthService.get_user_by_id(db, user_id)
+        else:
+            user = await AuthService.get_user_by_email(db, email)
 
         if not user:
             raise HTTPException(
