@@ -399,9 +399,9 @@ async def execute_mesh_chat_task(task_id: str, query: str):
             "message": "🤖 Agents are bidding and executing your tasks..."
         })
         
-        # Poll contracts for completion (max 30 seconds)
+        # Poll contracts for completion (max 10 seconds)
         import asyncio
-        max_wait = 30
+        max_wait = 10
         poll_interval = 0.5
         elapsed = 0
         
@@ -434,14 +434,14 @@ async def execute_mesh_chat_task(task_id: str, query: str):
         
         # STEP 6: Collect results
         logger.info(f"✅ [{task_id[:8]}] Collecting mesh results...")
-        
+
         final_results = []
         for contract_id in contract_ids:
             contract = mesh.contracts.get_contract(contract_id)
             if contract:
                 deliveries = mesh.contracts.deliveries.get(contract_id, [])
                 bids = mesh.contracts.get_bids(contract_id)
-                
+
                 result_data = {
                     "contract_id": contract_id,
                     "task_type": contract.intent,
@@ -449,14 +449,56 @@ async def execute_mesh_chat_task(task_id: str, query: str):
                     "awarded_to": contract.awarded_to[0] if contract.awarded_to else None,
                     "bids_count": len(bids)
                 }
-                
+
                 if deliveries:
                     delivery = deliveries[0]
                     result_data["result"] = delivery.data
                     result_data["agent_id"] = delivery.agent_id
-                
+
                 final_results.append(result_data)
-        
+
+        # FALLBACK: If mesh had no results, use Groq orchestrator
+        if not any(r.get('result') for r in final_results):
+            logger.info(f"⚡ [{task_id[:8]}] No mesh results, falling back to Groq orchestrator...")
+
+            try:
+                from hermes.conductor.orchestrator_groq import FreeGroqOrchestrator
+                groq_orchestrator = FreeGroqOrchestrator()
+
+                # Send status update
+                await manager.send_to_task(task_id, {
+                    "type": "status_update",
+                    "message": "Using FREE AI orchestrator (Groq)..."
+                })
+
+                # Use Groq to handle the query
+                groq_result = await groq_orchestrator.orchestrate(query, astraeus_client)
+
+                # Format as mesh-compatible result
+                final_results = [{
+                    "contract_id": "groq-fallback",
+                    "task_type": "ai_orchestration",
+                    "status": "DELIVERED",
+                    "awarded_to": "groq-llama3-70b",
+                    "bids_count": 1,
+                    "result": groq_result.get("result", str(groq_result)),
+                    "agent_id": "groq-orchestrator"
+                }]
+
+                logger.info(f"✅ [{task_id[:8]}] Groq orchestrator provided fallback result")
+
+            except Exception as e:
+                logger.error(f"❌ [{task_id[:8]}] Groq fallback failed: {e}")
+                # Return helpful error message
+                final_results = [{
+                    "contract_id": "error",
+                    "task_type": "error_message",
+                    "status": "FAILED",
+                    "result": {
+                        "message": f"No agents are currently available to handle this request. Please try again later or register an agent to handle '{parsed_intent.category}' tasks."
+                    }
+                }]
+
         # STEP 7: Format final response with LLM (optional - can be enhanced)
         result_text = f"🎯 **Task Complete!** I coordinated {len(final_results)} specialized agents:\n\n"
         
