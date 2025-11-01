@@ -39,6 +39,9 @@ class ConnectionManager:
         # Maps workflow_run_id -> set of WebSocket connections (Sprint 5)
         self.workflow_connections: Dict[str, Set[WebSocket]] = {}
 
+        # Message buffer: Maps task_id -> list of buffered events
+        self.message_buffer: Dict[str, list] = {}
+
         logger.info("📡 WebSocket Manager initialized")
 
     async def connect(self, websocket: WebSocket, task_id: str, user_id: Optional[str] = None):
@@ -64,6 +67,17 @@ class ConnectionManager:
             self.user_connections[user_id].add(websocket)
 
         logger.info(f"🔌 WebSocket connected - Task: {task_id[:8]}..., Subscribers: {len(self.active_connections[task_id])}")
+
+        # Send any buffered messages for this task
+        if task_id in self.message_buffer and self.message_buffer[task_id]:
+            logger.info(f"📦 Sending {len(self.message_buffer[task_id])} buffered messages to new connection")
+            for buffered_event in self.message_buffer[task_id]:
+                try:
+                    await websocket.send_json(buffered_event)
+                except Exception as e:
+                    logger.error(f"❌ Failed to send buffered message: {e}")
+            # Clear buffer after sending
+            del self.message_buffer[task_id]
 
     def disconnect(self, websocket: WebSocket, task_id: str, user_id: Optional[str] = None):
         """
@@ -124,18 +138,24 @@ class ConnectionManager:
     async def send_to_task(self, task_id: str, event: Dict[str, Any]):
         """
         Send event to all clients subscribed to a specific task.
+        If no clients are connected, buffer the event for later delivery.
 
         Args:
             task_id: Task ID
             event: Event data (will be JSON serialized)
         """
-        if task_id not in self.active_connections:
-            return
-
         # Add timestamp if not present
         if "timestamp" not in event:
             from datetime import datetime, timezone
             event["timestamp"] = datetime.now(timezone.utc).isoformat()
+
+        # If no active connections, buffer the message
+        if task_id not in self.active_connections or not self.active_connections[task_id]:
+            logger.info(f"📦 Buffering message for task {task_id[:8]}... (no active connections)")
+            if task_id not in self.message_buffer:
+                self.message_buffer[task_id] = []
+            self.message_buffer[task_id].append(event)
+            return
 
         # Broadcast to all connections
         disconnected = []
