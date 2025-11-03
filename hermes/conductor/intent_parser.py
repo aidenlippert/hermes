@@ -22,8 +22,10 @@ import logging
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from enum import Enum
+from opentelemetry import trace
 
 logger = logging.getLogger(__name__)
+tracer = trace.get_tracer(__name__)
 
 
 class IntentCategory(Enum):
@@ -173,74 +175,99 @@ Now parse the user's request."""
         Returns:
             ParsedIntent with all the structured information
         """
-        logger.info(f"🧠 Parsing intent: '{user_query[:100]}...'")
+        with tracer.start_as_current_span("intent_parse") as span:
+            span.set_attribute("query.length", len(user_query))
+            span.set_attribute("query.preview", user_query[:100])
 
-        try:
-            # Call Gemini
-            response = self.model.generate_content(
-                f"{self.system_prompt}\n\nUser Query: {user_query}"
-            )
+            logger.info(f"🧠 Parsing intent: '{user_query[:100]}...'")
 
-            # Parse JSON from response
-            response_text = response.text.strip()
+            try:
+                # Call Gemini with tracing
+                with tracer.start_as_current_span("gemini_generate_content") as gemini_span:
+                    gemini_span.set_attribute("model", self.model.model_name)
+                    response = self.model.generate_content(
+                        f"{self.system_prompt}\n\nUser Query: {user_query}"
+                    )
 
-            # Remove markdown code blocks if present
-            if response_text.startswith("```"):
-                response_text = response_text.split("```")[1]
-                if response_text.startswith("json"):
-                    response_text = response_text[4:]
+                # Parse JSON from response
+                with tracer.start_as_current_span("parse_json_response") as parse_span:
+                    response_text = response.text.strip()
 
-            result = json.loads(response_text)
+                    # Remove markdown code blocks if present
+                    if response_text.startswith("```"):
+                        response_text = response_text.split("```")[1]
+                        if response_text.startswith("json"):
+                            response_text = response_text[4:]
 
-            # Create ParsedIntent
-            intent = ParsedIntent(
-                original_query=user_query,
-                category=IntentCategory(result.get("category", "unknown")),
-                entities=result.get("entities", {}),
-                required_capabilities=result.get("required_capabilities", []),
-                complexity=float(result.get("complexity", 0.5)),
-                confidence=float(result.get("confidence", 0.5)),
-                metadata={
-                    "reasoning": result.get("reasoning", ""),
-                    "model": self.model.model_name
-                }
-            )
+                    result = json.loads(response_text)
+                    parse_span.set_attribute("json.parsed", True)
 
-            logger.info(f"✅ Intent parsed: {intent.category.value}")
-            logger.info(f"   Capabilities needed: {intent.required_capabilities}")
-            logger.info(f"   Complexity: {intent.complexity:.2f}")
-            logger.info(f"   Confidence: {intent.confidence:.2f}")
+                # Create ParsedIntent
+                intent = ParsedIntent(
+                    original_query=user_query,
+                    category=IntentCategory(result.get("category", "unknown")),
+                    entities=result.get("entities", {}),
+                    required_capabilities=result.get("required_capabilities", []),
+                    complexity=float(result.get("complexity", 0.5)),
+                    confidence=float(result.get("confidence", 0.5)),
+                    metadata={
+                        "reasoning": result.get("reasoning", ""),
+                        "model": self.model.model_name
+                    }
+                )
 
-            return intent
+                # Add intent attributes to span
+                span.set_attribute("intent.category", intent.category.value)
+                span.set_attribute("intent.complexity", intent.complexity)
+                span.set_attribute("intent.confidence", intent.confidence)
+                span.set_attribute("intent.capabilities", ",".join(intent.required_capabilities))
+                span.set_attribute("result.success", True)
 
-        except json.JSONDecodeError as e:
-            logger.error(f"❌ Failed to parse JSON from Gemini: {e}")
-            logger.error(f"   Raw response: {response_text}")
+                logger.info(f"✅ Intent parsed: {intent.category.value}")
+                logger.info(f"   Capabilities needed: {intent.required_capabilities}")
+                logger.info(f"   Complexity: {intent.complexity:.2f}")
+                logger.info(f"   Confidence: {intent.confidence:.2f}")
 
-            # Return a fallback intent
-            return ParsedIntent(
-                original_query=user_query,
-                category=IntentCategory.UNKNOWN,
-                entities={},
-                required_capabilities=[],
-                complexity=0.5,
-                confidence=0.0,
-                metadata={"error": "JSON parse failed", "raw": response_text}
-            )
+                return intent
 
-        except Exception as e:
-            logger.error(f"❌ Intent parsing failed: {e}")
+            except json.JSONDecodeError as e:
+                span.set_attribute("result.success", False)
+                span.set_attribute("error.type", "JSONDecodeError")
+                span.set_attribute("error.message", str(e))
+                span.record_exception(e)
 
-            # Return error intent
-            return ParsedIntent(
-                original_query=user_query,
-                category=IntentCategory.UNKNOWN,
-                entities={},
-                required_capabilities=[],
-                complexity=0.5,
-                confidence=0.0,
-                metadata={"error": str(e)}
-            )
+                logger.error(f"❌ Failed to parse JSON from Gemini: {e}")
+                logger.error(f"   Raw response: {response_text}")
+
+                # Return a fallback intent
+                return ParsedIntent(
+                    original_query=user_query,
+                    category=IntentCategory.UNKNOWN,
+                    entities={},
+                    required_capabilities=[],
+                    complexity=0.5,
+                    confidence=0.0,
+                    metadata={"error": "JSON parse failed", "raw": response_text}
+                )
+
+            except Exception as e:
+                span.set_attribute("result.success", False)
+                span.set_attribute("error.type", type(e).__name__)
+                span.set_attribute("error.message", str(e))
+                span.record_exception(e)
+
+                logger.error(f"❌ Intent parsing failed: {e}")
+
+                # Return error intent
+                return ParsedIntent(
+                    original_query=user_query,
+                    category=IntentCategory.UNKNOWN,
+                    entities={},
+                    required_capabilities=[],
+                    complexity=0.5,
+                    confidence=0.0,
+                    metadata={"error": str(e)}
+                )
 
 
 if __name__ == "__main__":
