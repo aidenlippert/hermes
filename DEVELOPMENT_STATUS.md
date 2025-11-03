@@ -25,15 +25,15 @@
 ### Sprint 1.1: HTN Planning Core Implementation
 - [x] Architecture design document (`hermes/planning/ARCHITECTURE.md`)
 - [x] Package initialization (`hermes/planning/__init__.py`)
-- [ ] Core data models (`hermes/planning/models.py`) ← **NEXT**
-- [ ] HTN planning engine (`hermes/planning/htn_core.py`)
+- [x] Core data models (`hermes/planning/models.py`) ✅ **36/36 tests pass**
+- [ ] HTN planning engine (`hermes/planning/htn_core.py`) ← **NEXT**
 - [ ] LLM integration (`hermes/planning/llm_planner.py`)
 - [ ] Hybrid orchestrator (`hermes/planning/hybrid_planner.py`)
 - [ ] Plan persistence layer (`hermes/planning/plan_storage.py`)
 
 ### Testing Infrastructure
-- [ ] Test directory structure (`hermes/planning/tests/`)
-- [ ] Unit tests for core components
+- [x] Test directory structure (`hermes/planning/tests/`)
+- [x] Unit tests for data models (36 tests, 100% pass rate)
 - [ ] Integration tests for Gemini
 - [ ] Performance benchmarks
 - [ ] Test fixtures and mocks

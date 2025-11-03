@@ -9,13 +9,13 @@ from .models import (
     TaskStatus,
     HTNTask,
     HTNPlan,
+    HTNState,
+    TaskDependency,
+    DependencyType,
     PlanningError,
     ValidationError,
     LLMError
 )
-
-from .htn_core import HTNPlanner
-from .hybrid_planner import HybridPlanner
 
 __version__ = "1.0.0"
 
@@ -24,8 +24,9 @@ __all__ = [
     "TaskStatus",
     "HTNTask",
     "HTNPlan",
-    "HTNPlanner",
-    "HybridPlanner",
+    "HTNState",
+    "TaskDependency",
+    "DependencyType",
     "PlanningError",
     "ValidationError",
     "LLMError"
